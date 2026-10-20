@@ -8,7 +8,7 @@ import { useNotificationStore } from '../../../store/notificationStore';
 import { useLogoutConfirmation } from '../../../hooks/useLogoutConfirmation';
 import { UserAvatar } from '../../ui/UserAvatar';
 import {
-  Menu, Bell, Settings, Sun, Moon, Globe, LogOut, ChevronDown, HeartPulse, CheckCheck, CalendarDays,
+  Menu, Bell, Settings, Sun, Moon, Globe, LogOut, ChevronDown, CheckCheck, CalendarDays,
 } from 'lucide-react';
 
 const LANGS = [
@@ -68,13 +68,7 @@ export function PortalHeader({ onOpenMobile }: Props) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
-            <HeartPulse className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-text-main dark:text-white">HAS</p>
-            <p className="hidden truncate text-xs text-text-muted dark:text-slate-400 sm:block">{t('portal.systemSubtitle')}</p>
-          </div>
+          <p className="truncate text-base font-bold text-text-main dark:text-white">{t('portal.systemSubtitle')}</p>
         </div>
 
         {/* Right: theme, notifications, settings, language, user */}

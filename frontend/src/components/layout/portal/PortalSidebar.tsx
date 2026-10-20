@@ -144,8 +144,9 @@ export function PortalSidebar({ collapsed, onToggle, mobileOpen, onCloseMobile }
         </span>
         {!collapsed && (
           <div className="min-w-0">
+            {/* The full system name lives in the top header only — repeating it here put the
+                entire "HAS Hospital Appointments Management System" line on screen twice. */}
             <p className="truncate text-sm font-bold text-text-main dark:text-white">HAS</p>
-            <p className="truncate text-xs text-text-muted dark:text-slate-400">{t('portal.systemSubtitle')}</p>
           </div>
         )}
       </div>

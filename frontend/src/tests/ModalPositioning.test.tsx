@@ -8,7 +8,7 @@ function overlayOf(dialog: HTMLElement): HTMLElement {
 }
 
 describe('modal vertical positioning', () => {
-  it('places the shared Modal 40px from the top, still horizontally centered', () => {
+  it('places the shared Modal a small gap from the top, still horizontally centered', () => {
     render(
       <Modal isOpen onClose={() => undefined} title="Add Doctor">
         <p>Body</p>
@@ -17,7 +17,7 @@ describe('modal vertical positioning', () => {
     const dialog = screen.getByRole('dialog', { name: 'Add Doctor' });
     const overlay = overlayOf(dialog);
 
-    expect(overlay.className).toContain('pt-10');
+    expect(overlay.className).toContain('pt-6');
     expect(overlay.className).toContain('items-start');
     expect(overlay.className).toContain('justify-center');
     expect(overlay.className).not.toContain('items-center');
@@ -31,7 +31,7 @@ describe('modal vertical positioning', () => {
     );
     const dialog = screen.getByRole('dialog', { name: 'Add Doctor' });
 
-    expect(dialog.className).toContain('max-h-[calc(100dvh-3.5rem)]');
+    expect(dialog.className).toContain('max-h-[calc(100dvh-2.25rem)]');
     expect(dialog.className).toContain('flex-col');
     expect(overlayOf(dialog).className).toContain('overflow-hidden');
   });
@@ -66,10 +66,10 @@ describe('modal vertical positioning', () => {
     const overlay = overlayOf(dialog);
     const [header, body, footer] = Array.from(dialog.children);
 
-    expect(overlay.className).toContain('pt-10');
+    expect(overlay.className).toContain('pt-6');
     expect(overlay.className).toContain('items-start');
     expect(overlay.className).not.toContain('items-center');
-    expect(dialog.className).toContain('max-h-[calc(100dvh-3.5rem)]');
+    expect(dialog.className).toContain('max-h-[calc(100dvh-2.25rem)]');
     expect(header.className).toContain('shrink-0');
     expect(body.className).toContain('overflow-y-auto');
     expect(body.className).toContain('min-h-0');

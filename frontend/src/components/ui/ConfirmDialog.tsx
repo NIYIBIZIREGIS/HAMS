@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from './Button';
 
@@ -26,11 +27,14 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden px-4 pb-4 pt-10">
+  // Portalled to <body>: every call site renders this inside a layout header or sidebar, and
+  // those ancestors carry `backdrop-blur`, z-index stacking contexts and fixed positioning —
+  // which trap a plain `position: fixed` overlay and clip it so the dialog never appears.
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden px-4 pb-3 pt-6">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
-        className="relative flex w-full max-w-sm flex-col overflow-hidden rounded-xl border border-slate-200 bg-card shadow-md max-h-[calc(100dvh-3.5rem)]"
+        className="relative flex w-full max-w-sm flex-col overflow-hidden rounded-xl border border-slate-200 bg-card shadow-md max-h-[calc(100dvh-2.25rem)]"
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
@@ -53,6 +57,7 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

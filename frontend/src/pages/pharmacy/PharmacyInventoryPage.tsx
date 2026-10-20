@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
-import api from '../../services/api';
+import { StepIndicator } from '../../components/ui/StepIndicator';
+import { useAuthStore } from '../../store/authStore';
+import api, { listFacilities, type Facility } from '../../services/api';
 import {
   Plus,
   Search,
@@ -13,6 +16,8 @@ import {
   AlertTriangle,
   Package,
   RotateCcw,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 
 interface InventoryItem {
@@ -47,6 +52,8 @@ const EMPTY_FORM = {
   quantityOnHand: 0,
   reorderThreshold: 10,
   unitCost: 0,
+  // Only sent by platform admins; a hospital-scoped account is pinned to its own hospital.
+  facilityId: '',
 };
 
 function toItemForm(item: InventoryItem) {
@@ -59,10 +66,22 @@ function toItemForm(item: InventoryItem) {
     quantityOnHand: item.quantityOnHand,
     reorderThreshold: item.reorderThreshold,
     unitCost: item.unitCost,
+    facilityId: '',
   };
 }
 
 export function PharmacyInventoryPage() {
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // A platform admin must name the hospital the item belongs to; hospital-scoped accounts
+  // are pinned to their own facility and never see this selector.
+  const { data: facilities } = useQuery<Facility[]>({
+    queryKey: ['facilities'],
+    queryFn: listFacilities,
+    enabled: isSuperAdmin,
+  });
+
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -77,6 +96,9 @@ export function PharmacyInventoryPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  // The add/edit modal is a two-step form: the drug identity first, then batch/stock figures —
+  // the single wall of fields pushed the action row off screen on small viewports.
+  const [formStep, setFormStep] = useState(1);
 
   const [showWriteOff, setShowWriteOff] = useState(false);
   const [writeOffItem, setWriteOffItem] = useState<InventoryItem | null>(null);
@@ -109,6 +131,7 @@ export function PharmacyInventoryPage() {
     setEditItem(null);
     setForm(EMPTY_FORM);
     setFormError('');
+    setFormStep(1);
     setShowForm(true);
   };
 
@@ -116,13 +139,24 @@ export function PharmacyInventoryPage() {
     setEditItem(item);
     setForm(toItemForm(item));
     setFormError('');
+    setFormStep(1);
     setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setFormStep(1);
   };
 
   const handleClearForm = () => {
     setForm(editItem ? toItemForm(editItem) : EMPTY_FORM);
     setFormError('');
   };
+
+  // Step 1 holds the drug's identity; the batch/stock figures live on step 2. Keeping the two
+  // apart means the required fields are all visible at once instead of below the fold.
+  const identityValid = Boolean(form.drugName.trim());
+  const canSubmit = identityValid && Boolean(form.expiryDate) && (!isSuperAdmin || editItem || Boolean(form.facilityId));
 
   const handleSave = async () => {
     setFormError('');
@@ -134,14 +168,19 @@ export function PharmacyInventoryPage() {
       setFormError('Expiry date is required');
       return;
     }
+    if (!editItem && isSuperAdmin && !form.facilityId) {
+      setFormError('Please select a hospital for this item');
+      return;
+    }
     setSaving(true);
     try {
       if (editItem) {
         await api.put(`/pharmacy/inventory/${editItem._id}`, form);
       } else {
-        await api.post('/pharmacy/inventory', form);
+        const payload = isSuperAdmin ? form : { ...form, facilityId: undefined };
+        await api.post('/pharmacy/inventory', payload);
       }
-      setShowForm(false);
+      closeForm();
       void fetchItems();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save';
@@ -315,36 +354,78 @@ export function PharmacyInventoryPage() {
       {/* Create / Edit Modal */}
       <Modal
         open={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={closeForm}
         title={editItem ? 'Edit Inventory Item' : 'Add Inventory Item'}
         width="lg"
         density="compact"
         footer={
-          <>
-            <Button variant="ghost" icon={RotateCcw} onClick={handleClearForm}>Clear</Button>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button loading={saving} onClick={handleSave}>{editItem ? 'Save Changes' : 'Add Item'}</Button>
-          </>
+          formStep === 1 ? (
+            <>
+              <Button variant="ghost" icon={RotateCcw} onClick={handleClearForm}>Clear</Button>
+              <Button variant="ghost" onClick={closeForm}>Cancel</Button>
+              <Button icon={ArrowRight} onClick={() => setFormStep(2)}>Continue</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" icon={ArrowLeft} onClick={() => setFormStep(1)}>Back</Button>
+              <Button variant="ghost" onClick={closeForm}>Cancel</Button>
+              <Button
+                icon={editItem ? undefined : ArrowRight}
+                loading={saving}
+                disabled={!canSubmit}
+                onClick={handleSave}
+              >
+                {editItem ? 'Save Changes' : 'Add Item'}
+              </Button>
+            </>
+          )
         }
       >
         <div className="space-y-3">
+          <StepIndicator
+            current={formStep}
+            steps={['Drug Details', 'Batch & Stock']}
+            onSelect={(s) => s < formStep && setFormStep(s)}
+          />
           {formError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{formError}</div>
           )}
-          <Input label="Drug Name" value={form.drugName} onChange={(e) => setForm({ ...form, drugName: e.target.value })} required icon={Package} />
-          <div className="grid grid-cols-2 gap-3">
-            <Select label="Form" options={FORM_OPTIONS.slice(1)} value={form.form} onChange={(e) => setForm({ ...form, form: e.target.value })} />
-            <Input label="Strength" value={form.strength} onChange={(e) => setForm({ ...form, strength: e.target.value })} placeholder="e.g. 500mg" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Batch Number" value={form.batchNumber} onChange={(e) => setForm({ ...form, batchNumber: e.target.value })} />
-            <Input label="Expiry Date" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} required />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Input label="Quantity" type="number" value={String(form.quantityOnHand)} onChange={(e) => setForm({ ...form, quantityOnHand: parseInt(e.target.value) || 0 })} />
-            <Input label="Reorder Threshold" type="number" value={String(form.reorderThreshold)} onChange={(e) => setForm({ ...form, reorderThreshold: parseInt(e.target.value) || 0 })} />
-            <Input label="Unit Cost ($)" type="number" step="0.01" value={String(form.unitCost)} onChange={(e) => setForm({ ...form, unitCost: parseFloat(e.target.value) || 0 })} />
-          </div>
+
+          {formStep === 1 && (
+            <>
+              <Input label="Drug Name" value={form.drugName} onChange={(e) => setForm({ ...form, drugName: e.target.value })} required icon={Package} />
+              <div className="grid grid-cols-2 gap-3">
+                <Select label="Form" options={FORM_OPTIONS.slice(1)} value={form.form} onChange={(e) => setForm({ ...form, form: e.target.value })} />
+                <Input label="Strength" value={form.strength} onChange={(e) => setForm({ ...form, strength: e.target.value })} placeholder="e.g. 500mg" />
+              </div>
+              {!editItem && isSuperAdmin && (
+                <Select
+                  label="Hospital"
+                  options={[
+                    { value: '', label: '— Select a hospital —' },
+                    ...(facilities ?? []).map((f) => ({ value: f._id, label: f.name })),
+                  ]}
+                  value={form.facilityId}
+                  onChange={(e) => setForm({ ...form, facilityId: e.target.value })}
+                  hint="A platform admin must assign the stock item to a hospital."
+                />
+              )}
+            </>
+          )}
+
+          {formStep === 2 && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Batch Number" value={form.batchNumber} onChange={(e) => setForm({ ...form, batchNumber: e.target.value })} />
+                <Input label="Expiry Date" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} required />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Quantity" type="number" value={String(form.quantityOnHand)} onChange={(e) => setForm({ ...form, quantityOnHand: parseInt(e.target.value) || 0 })} />
+                <Input label="Reorder Threshold" type="number" value={String(form.reorderThreshold)} onChange={(e) => setForm({ ...form, reorderThreshold: parseInt(e.target.value) || 0 })} />
+                <Input label="Unit Cost ($)" type="number" step="0.01" value={String(form.unitCost)} onChange={(e) => setForm({ ...form, unitCost: parseFloat(e.target.value) || 0 })} />
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

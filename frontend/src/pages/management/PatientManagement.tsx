@@ -16,6 +16,8 @@ import {
   CreditCard,
   Droplet,
   RotateCcw,
+  ArrowLeft,
+  ArrowRight,
   X,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
@@ -25,6 +27,7 @@ import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Spinner } from '../../components/ui/Spinner';
+import { StepIndicator } from '../../components/ui/StepIndicator';
 import { pageWindow } from '../../components/ui/Pagination';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import { ZoomableImage } from '../../components/ui/ImageLightbox';
@@ -178,6 +181,9 @@ export function PatientManagement() {
   const [detail, setDetail] = useState<Patient | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [form, setForm] = useState(EMPTY_REGISTER);
+  // The register modal is a two-step form: identity/credentials first, medical details and
+  // hospital assignment second — one wall of fields made the form hard to scan.
+  const [registerStep, setRegisterStep] = useState(1);
 
   const { data: patients, isLoading } = useQuery<Patient[]>({
     queryKey: ['patients', search],
@@ -238,6 +244,7 @@ export function PatientManagement() {
       toast.success('Patient registered successfully.', 'Patient created');
       setShowRegister(false);
       setForm(EMPTY_REGISTER);
+      setRegisterStep(1);
       invalidate();
     },
     onError: (err) => {
@@ -304,15 +311,20 @@ export function PatientManagement() {
     setShowDelete(true);
   };
 
-  const canSubmitRegister =
+  // Step 1 gate: every field the backend's registerPatientSchema rejects.
+  const identityValid =
     form.fullName.trim().length >= 5 &&
     namePattern.test(form.fullName.trim()) &&
     emailPattern.test(form.email.trim()) &&
     phonePattern.test(form.phone.trim()) &&
     nationalIdPattern.test(form.nationalId.trim()) &&
     form.password.length >= 6 &&
-    passwordPattern.test(form.password) &&
-    (!isSuperAdmin || Boolean(form.facilityId));
+    passwordPattern.test(form.password);
+
+  // Final gate: identity plus the hospital a platform admin must assign on step 2.
+  // The medical fields are optional, so they never block submission.
+  const canSubmitRegister =
+    identityValid && (!isSuperAdmin || Boolean(form.facilityId));
 
   return (
     <div className="space-y-6">
@@ -648,126 +660,167 @@ export function PatientManagement() {
         onClose={() => {
           setShowRegister(false);
           setForm(EMPTY_REGISTER);
+          setRegisterStep(1);
         }}
         title="Register Patient"
         width="lg"
         density="compact"
         footer={
           <>
-            <Button variant="ghost" icon={RotateCcw} onClick={() => setForm(EMPTY_REGISTER)}>
-              Clear
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowRegister(false);
-                setForm(EMPTY_REGISTER);
-              }}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              icon={Plus}
-              loading={registerMutation.isPending}
-              disabled={!canSubmitRegister}
-              onClick={() => registerMutation.mutate(form)}
-            >
-              Register Patient
-            </Button>
+            {registerStep === 1 ? (
+              <>
+                <Button variant="ghost" icon={RotateCcw} onClick={() => setForm(EMPTY_REGISTER)}>
+                  Clear
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRegister(false);
+                    setForm(EMPTY_REGISTER);
+                    setRegisterStep(1);
+                  }}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  icon={ArrowRight}
+                  disabled={!identityValid}
+                  onClick={() => setRegisterStep(2)}
+                >
+                  Continue
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowRegister(false);
+                    setForm(EMPTY_REGISTER);
+                    setRegisterStep(1);
+                  }}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button variant="outline" icon={ArrowLeft} onClick={() => setRegisterStep(1)}>
+                  Back
+                </Button>
+                <Button
+                  icon={Plus}
+                  loading={registerMutation.isPending}
+                  disabled={!canSubmitRegister}
+                  onClick={() => registerMutation.mutate(form)}
+                >
+                  Register Patient
+                </Button>
+              </>
+            )}
           </>
         }
       >
-        <div className="space-y-3">
+        <div className="space-y-2.5">
+          <StepIndicator
+            current={registerStep}
+            steps={['Identity & Account', 'Medical & Hospital']}
+            onSelect={(n) => {
+              // Backwards only: step 1 must validate before moving forward.
+              if (n < registerStep) setRegisterStep(n);
+            }}
+          />
           <p className="text-xs text-slate-500">
-            Create a new patient account. The patient will receive full portal access with
-            these credentials.
+            {registerStep === 1
+              ? 'Create a new patient account. The patient will receive full portal access with these credentials.'
+              : 'Optional medical details and hospital assignment. Any of these can be completed later from the patient record.'}
           </p>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              label="Full name"
-              value={form.fullName}
-              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-              placeholder="e.g. Jean Mugisha"
-              required
-              autoComplete="off"
-              hint="At least 5 characters: letters, spaces, hyphens, apostrophes and periods."
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              label="Phone"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              required
-              placeholder="e.g. 0788123456"
-              hint="Rwandan mobile format: 10 digits starting with 0."
-            />
-            <Input
-              label="National ID"
-              value={form.nationalId}
-              onChange={(e) => setForm({ ...form, nationalId: e.target.value })}
-              required
-              placeholder="e.g. 1198800123456789"
-              hint="16 digits starting with 1."
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              label="Password"
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-              minLength={6}
-              hint="At least 6 chars with a letter, number and symbol."
-            />
-            <Input
-              label="Allergies (comma separated)"
-              value={form.allergies}
-              onChange={(e) => setForm({ ...form, allergies: e.target.value })}
-              placeholder="e.g. Penicillin, Peanuts"
-            />
-          </div>
+          {registerStep === 1 ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label="Full name"
+                  value={form.fullName}
+                  onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                  placeholder="e.g. Jean Mugisha"
+                  required
+                  autoComplete="off"
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label="Phone"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  required
+                  placeholder="e.g. 0788123456"
+                />
+                <Input
+                  label="National ID"
+                  value={form.nationalId}
+                  onChange={(e) => setForm({ ...form, nationalId: e.target.value })}
+                  required
+                  placeholder="e.g. 1198800123456789"
+                />
+              </div>
+              <Input
+                label="Password"
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                required
+                minLength={6}
+                placeholder="At least 6 chars with a letter, number and symbol"
+              />
+            </>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Input
+                  label="Date of birth"
+                  type="date"
+                  value={form.dob}
+                  onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                />
+                <Select
+                  label="Gender"
+                  options={genderOptions}
+                  value={form.gender}
+                  onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                />
+                <Select
+                  label="Blood group"
+                  options={bloodGroupOptions}
+                  value={form.bloodGroup}
+                  onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
+                />
+              </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Input
-              label="Date of birth"
-              type="date"
-              value={form.dob}
-              onChange={(e) => setForm({ ...form, dob: e.target.value })}
-            />
-            <Select
-              label="Gender"
-              options={genderOptions}
-              value={form.gender}
-              onChange={(e) => setForm({ ...form, gender: e.target.value })}
-            />
-            <Select
-              label="Blood group"
-              options={bloodGroupOptions}
-              value={form.bloodGroup}
-              onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
-            />
-          </div>
+              <Input
+                label="Allergies (comma separated)"
+                value={form.allergies}
+                onChange={(e) => setForm({ ...form, allergies: e.target.value })}
+                placeholder="e.g. Penicillin, Peanuts"
+              />
 
-          {isSuperAdmin && (
-            <Select
-              label="Hospital"
-              options={[
-                { value: '', label: '— Select a hospital —' },
-                ...(facilities ?? []).map((f) => ({ value: f._id, label: f.name })),
-              ]}
-              value={form.facilityId}
-              onChange={(e) => setForm({ ...form, facilityId: e.target.value })}
-            />
+              {isSuperAdmin && (
+                <Select
+                  label="Hospital"
+                  options={[
+                    { value: '', label: '— Select a hospital —' },
+                    ...(facilities ?? []).map((f) => ({ value: f._id, label: f.name })),
+                  ]}
+                  value={form.facilityId}
+                  onChange={(e) => setForm({ ...form, facilityId: e.target.value })}
+                  hint="A platform admin must assign the patient to a hospital."
+                />
+              )}
+            </>
           )}
         </div>
       </Modal>

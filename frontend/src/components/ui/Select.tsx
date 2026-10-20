@@ -5,6 +5,8 @@ import { useDensity } from './density';
 interface Props extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
+  /** Helper text below the field, hidden once an `error` replaces it — same contract as Input. */
+  hint?: string;
   placeholder?: string;
   options: { value: string; label: string }[];
   /**
@@ -19,6 +21,7 @@ export const Select = forwardRef<HTMLSelectElement, Props>(
     {
       label,
       error,
+      hint,
       placeholder,
       options,
       density: densityProp,
@@ -58,6 +61,7 @@ export const Select = forwardRef<HTMLSelectElement, Props>(
                 : 'border-slate-200 hover:border-slate-300'
             } ${className}`}
             aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? `${selectId}-error` : hint ? `${selectId}-hint` : undefined}
             {...props}
           >
             {placeholder && (
@@ -74,8 +78,17 @@ export const Select = forwardRef<HTMLSelectElement, Props>(
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         </div>
         {error && (
-          <p className="mt-1 flex items-center gap-1 text-xs text-status-cancelled-text" role="alert">
+          <p
+            id={`${selectId}-error`}
+            className="mt-1 flex items-center gap-1 text-xs text-status-cancelled-text"
+            role="alert"
+          >
             {error}
+          </p>
+        )}
+        {hint && !error && (
+          <p id={`${selectId}-hint`} className={`text-text-muted ${dense ? 'mt-1 text-xs' : 'mt-1.5 text-xs'}`}>
+            {hint}
           </p>
         )}
       </div>

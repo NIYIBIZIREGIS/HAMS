@@ -61,12 +61,12 @@ export function Modal({
     <DensityContext.Provider value={density}>
       <div
         ref={overlayRef}
-        className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden px-4 pb-4 pt-10"
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden px-4 pb-3 pt-6"
         onClick={(e) => e.target === overlayRef.current && onClose()}
       >
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
         <div
-          className={`relative flex max-h-[calc(100dvh-3.5rem)] w-full flex-col ${widthClasses[width]} rounded-xl border border-slate-200 bg-card shadow-md animate-in fade-in zoom-in-95`}
+          className={`relative flex max-h-[calc(100dvh-2.25rem)] w-full flex-col ${widthClasses[width]} rounded-xl border border-slate-200 bg-card shadow-md animate-in fade-in zoom-in-95`}
           role="dialog"
           aria-modal="true"
           aria-label={title}
