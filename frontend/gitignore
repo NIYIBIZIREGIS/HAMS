@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build (Vite = dist, Create React App = build)
+dist/
+build/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# Caches (Vite, ESLint, Tailwind, TypeScript)
+.vite/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# Deployment folders
+.vercel/
+.netlify/
+
+# Package manager caches
+.npm
+.yarn/cache
+.pnpm-store/
+
+# Editor / OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f4f5"/>
+      <stop offset="1" stop-color="#e4e4e7"/>
+    </linearGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#18181b" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="900" fill="url(#g)"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+  <g fill="none" stroke="#18181b" stroke-opacity="0.07" stroke-width="2">
+    <path d="M -100 620 C 250 480, 550 780, 900 560 C 1150 390, 1400 620, 1700 420"/>
+    <path d="M -100 740 C 300 600, 600 860, 950 660 C 1200 500, 1450 720, 1700 560"/>
+  </g>
+  <g fill="#18181b" fill-opacity="0.05">
+    <circle cx="180" cy="180" r="90"/>
+    <circle cx="1420" cy="700" r="120"/>
+    <circle cx="1280" cy="150" r="48"/>
+    <circle cx="320" cy="760" r="64"/>
+  </g>
+  <g stroke="#18181b" stroke-opacity="0.06" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M 640 430 l 26 -50 24 78 28 -52 22 24h 62"/>
+    <path d="M 720 640 l 18 -30 16 44 20 -34h 44"/>
+  </g>
+</svg>

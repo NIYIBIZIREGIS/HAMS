@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Environment variables (DB URI, JWT secret, API keys)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Uploads / temp files
+uploads/
+tmp/
+temp/
+
+# Local MongoDB data (if running mongod inside the project)
+data/db/
+*.pid
+*.seed
+*.pid.lock
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build output (if using TypeScript or a bundler)
+dist/
+build/
+
+# Package manager caches
+.npm
+.yarn/cache
+.pnpm-store/
+
+# Editor / OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
