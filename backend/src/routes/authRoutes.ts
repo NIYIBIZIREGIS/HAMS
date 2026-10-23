@@ -21,6 +21,7 @@ import {
   verifyPhoneSendSchema,
   verifyConfirmSchema,
   profileImageSchema,
+  updateProfileSchema,
 } from '../validators/schemas';
 
 const router = Router();
@@ -72,6 +73,7 @@ router.post(
   asyncHandler(authController.changePassword)
 );
 router.put('/profile-image', authenticate, validate(profileImageSchema), asyncHandler(authController.updateProfileImage));
+router.put('/profile', authenticate, validate(updateProfileSchema), asyncHandler(authController.updateProfile));
 
 // ── Contact verification (real email + SMS codes) ─────────────────────────────
 router.post('/verify/email/send', authLimiter, authenticate, validate(verifyEmailSendSchema), asyncHandler(verificationController.sendEmailCode));

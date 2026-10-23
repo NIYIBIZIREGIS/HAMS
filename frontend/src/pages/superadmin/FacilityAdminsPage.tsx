@@ -15,7 +15,6 @@ import {
   ChevronRight,
   AlertCircle,
   CheckCircle2,
-  X,
   ShieldCheck,
   Users,
   Activity,
@@ -66,7 +65,6 @@ export function FacilityAdminsPage() {
   const [selectedFacility, setSelectedFacility] = useState<string>('');
   const [reassignAdmin, setReassignAdmin] = useState<StaffUser | null>(null);
   const [removeAdmin, setRemoveAdmin] = useState<StaffUser | null>(null);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [regForm, setRegForm] = useState(EMPTY_REG_FORM);
 
@@ -126,16 +124,15 @@ export function FacilityAdminsPage() {
     mutationFn: ({ adminId, facilityId }: { adminId: string; facilityId: string }) =>
       client.post('/admin/assign-facility', { adminId, facilityId }),
     onSuccess: () => {
-      setFeedback({ type: 'success', message: 'Admin assigned to facility successfully' });
+      toast.success('Admin assigned to facility successfully.');
       setShowAssignModal(false);
       setSelectedAdmin('');
       setSelectedFacility('');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['facilities'] });
-      setTimeout(() => setFeedback(null), 4000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -143,15 +140,14 @@ export function FacilityAdminsPage() {
     mutationFn: ({ adminId, newFacilityId }: { adminId: string; newFacilityId: string }) =>
       client.put('/admin/reassign-facility', { adminId, newFacilityId }),
     onSuccess: () => {
-      setFeedback({ type: 'success', message: 'Admin reassigned successfully' });
+      toast.success('Admin reassigned successfully.');
       setShowReassignModal(false);
       setReassignAdmin(null);
       setSelectedFacility('');
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setTimeout(() => setFeedback(null), 4000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -159,14 +155,13 @@ export function FacilityAdminsPage() {
     mutationFn: (adminId: string) =>
       client.delete(`/admin/remove-facility/${adminId}`),
     onSuccess: () => {
-      setFeedback({ type: 'success', message: 'Admin assignment removed' });
+      toast.success('Admin assignment removed.');
       setShowRemoveConfirm(false);
       setRemoveAdmin(null);
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setTimeout(() => setFeedback(null), 4000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -186,7 +181,7 @@ export function FacilityAdminsPage() {
       queryClient.invalidateQueries({ queryKey: ['facilities'] });
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -263,27 +258,6 @@ export function FacilityAdminsPage() {
           </Button>
         </div>
       </div>
-
-      {/* Feedback */}
-      {feedback && (
-        <div
-          className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
-            feedback.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700'
-          }`}
-        >
-          {feedback.type === 'success' ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertCircle className="h-4 w-4 shrink-0" />
-          )}
-          {feedback.message}
-          <button onClick={() => setFeedback(null)} className="ml-auto">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* Summary Stats */}
       <div className="grid gap-4 sm:grid-cols-4">
@@ -605,7 +579,7 @@ export function FacilityAdminsPage() {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label="Phone (optional)"
               name="regPhone"
@@ -814,7 +788,7 @@ export function FacilityAdminsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+          <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
             <Button
               variant="outline"
               onClick={() => {

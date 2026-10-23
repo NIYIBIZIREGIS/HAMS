@@ -62,7 +62,18 @@ client.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
     const isRefreshEndpoint = original?.url?.includes('/auth/refresh');
-    if (error.response?.status === 401 && original && !original._retry && !isRefreshEndpoint) {
+    // Signing in with bad credentials is a 401 too. Trying to refresh (and then hard-reloading
+    // the page when there is no session) would wipe the form instead of showing the error.
+    const isAuthAttempt = /\/auth\/(login|register|otp|forgot-password|reset-password)/.test(
+      original?.url ?? '',
+    );
+    if (
+      error.response?.status === 401 &&
+      original &&
+      !original._retry &&
+      !isRefreshEndpoint &&
+      !isAuthAttempt
+    ) {
       original._retry = true;
       try {
         refreshPromise = refreshPromise ?? refreshAccessToken();

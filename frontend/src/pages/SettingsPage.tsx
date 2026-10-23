@@ -8,10 +8,11 @@ import { changePassword } from '../services/auth';
 import { toast } from '../store/toastStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { UserAvatar } from '../components/ui/UserAvatar';
 import {
   User, Palette, Lock, Sun, Moon, Mail, Phone, IdCard, ShieldCheck, Save, HeartPulse, BadgeCheck, KeyRound,
-  Camera, Trash2,
+  Camera, Trash2, Pencil,
 } from 'lucide-react';
 
 const MAX_PHOTO_BYTES = 512 * 1024;
@@ -54,6 +55,7 @@ export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const updateProfileImage = useAuthStore((s) => s.updateProfileImage);
+  const updateProfile = useAuthStore((s) => s.updateProfile);
   const sendEmailCode = useAuthStore((s) => s.sendEmailCode);
   const verifyEmailCode = useAuthStore((s) => s.verifyEmailCode);
   const sendPhoneCode = useAuthStore((s) => s.sendPhoneCode);
@@ -82,8 +84,39 @@ export function SettingsPage() {
   const [photoError, setPhotoError] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editFullName, setEditFullName] = useState(user?.fullName ?? '');
+  const [editPhone, setEditPhone] = useState(user?.phone ?? '');
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const openEditProfile = () => {
+    setEditFullName(user?.fullName ?? '');
+    setEditPhone(user?.phone ?? '');
+    setEditError('');
+    setEditProfileOpen(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (editFullName.trim().length < 2) {
+      setEditError('Please enter your full name.');
+      return;
+    }
+    setEditBusy(true);
+    setEditError('');
+    try {
+      await updateProfile({ fullName: editFullName.trim(), phone: editPhone.trim() });
+      toast.success('Your profile has been updated.', 'Profile');
+      setEditProfileOpen(false);
+    } catch (err) {
+      setEditError(getErrorMessage(err));
+    } finally {
+      setEditBusy(false);
+    }
+  };
 
   const currentLang = LANGS.find((l) => i18n.language?.startsWith(l.code)) ?? LANGS[0];
+  void currentLang;
   const v = 'portal.settings.verification';
 
   const statusLabel = (status?: string) => {
@@ -347,10 +380,15 @@ export function SettingsPage() {
             </div>
           </div>
         </div>
-      </Section>
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" size="sm" icon={Pencil} onClick={openEditProfile}>
+              Edit profile
+            </Button>
+          </div>
+        </Section>
 
-      <Section icon={Palette} title={t('portal.settings.preferencesTitle')} subtitle={t('portal.settings.preferencesSubtitle')}>
-        <div className="space-y-6">
+        <Section icon={Palette} title={t('portal.settings.preferencesTitle')} subtitle={t('portal.settings.preferencesSubtitle')}>
+          <div className="space-y-6">
           <div>
             <p className="mb-3 text-sm font-semibold text-text-main dark:text-slate-300">{t('portal.settings.theme')}</p>
             <div className="flex gap-2">
@@ -391,7 +429,6 @@ export function SettingsPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-text-muted">Current: {currentLang.label}</p>
           </div>
         </div>
       </Section>
@@ -477,43 +514,77 @@ export function SettingsPage() {
       </Section>
 
       <Section icon={Lock} title={t('portal.settings.securityTitle')} subtitle={t('portal.settings.securitySubtitle')}>
-        <div className="max-w-md space-y-3">
-          <Input
-            label="Current password"
-            name="currentPassword"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-          />
-          <Input
-            label="New password"
-            name="newPassword"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            minLength={6}
-            autoComplete="new-password"
-            hint="At least 6 characters with a letter, a number and a symbol."
-          />
-          <Input
-            label="Confirm new password"
-            name="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            minLength={6}
-            autoComplete="new-password"
-          />
-          {pwdError && <p className="rounded-xl border border-status-cancelled-bg bg-status-cancelled-bg p-3 text-sm text-status-cancelled-text dark:border-red-900 dark:bg-red-950 dark:text-red-300" role="alert">{pwdError}</p>}
-          <Button type="button" loading={pwdBusy} onClick={handleChangePassword} icon={Save}>
-            {t('portal.settings.changePassword')}
-          </Button>
+        <div className="max-w-md space-y-4">
+          <div className="grid gap-3 sm:grid-cols-1">
+            <Input
+              label="Current password"
+              name="currentPassword"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+            <Input
+              label="New password"
+              name="newPassword"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              hint="At least 6 characters with a letter, a number and a symbol."
+            />
+            <Input
+              label="Confirm new password"
+              name="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+            />
+          </div>
+          {pwdError && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300" role="alert">{pwdError}</p>}
+          <div className="flex justify-end">
+            <Button type="button" loading={pwdBusy} onClick={handleChangePassword} icon={Save}>
+              {t('portal.settings.changePassword')}
+            </Button>
+          </div>
         </div>
       </Section>
+
+      <Modal
+        open={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        title="Edit Profile"
+        width="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditProfileOpen(false)}>Cancel</Button>
+            <Button onClick={() => void handleSaveProfile()} loading={editBusy}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Input label="Full name" value={editFullName} onChange={(e) => setEditFullName(e.target.value)} placeholder="Your full name" />
+          <Input label="Phone number" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+250..." />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Email" value={user?.email ?? '—'} disabled />
+            <Input label="National ID" value={user?.nationalId ?? '—'} disabled />
+            <Input label="Role" value={user?.role?.replace(/_/g, ' ') ?? '—'} disabled className="capitalize" />
+            <Input label="Account status" value={user?.status ?? 'Active'} disabled className="capitalize" />
+          </div>
+          <p className="text-xs text-text-muted dark:text-slate-400">
+            Email, national ID and role are managed by your facility administrator.
+          </p>
+          {editError && <p className="text-xs font-medium text-red-600 dark:text-red-400" role="alert">{editError}</p>}
+        </div>
+      </Modal>
     </div>
   );
 }

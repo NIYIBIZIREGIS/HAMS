@@ -116,6 +116,7 @@ export default function DoctorManagement() {
   const [deletingDoc, setDeletingDoc] = useState<Doctor | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Doctor | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
+  const [editStep, setEditStep] = useState<1 | 2>(1);
   const [editPhoto, setEditPhoto] = useState<string | undefined>(undefined);
   const [editPhotoRemoved, setEditPhotoRemoved] = useState(false);
   const [editPhotoError, setEditPhotoError] = useState('');
@@ -356,6 +357,7 @@ export default function DoctorManagement() {
     setEditPhoto(undefined);
     setEditPhotoRemoved(false);
     setEditPhotoError('');
+    setEditStep(1);
     setIsEditModalOpen(true);
   };
 
@@ -957,7 +959,7 @@ export default function DoctorManagement() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
               <Button
                 variant="outline"
                 icon={Pencil}
@@ -981,185 +983,222 @@ export default function DoctorManagement() {
 {/* Edit Doctor Modal */}
       <Modal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditStep(1);
+        }}
         title="Edit Doctor"
         width="lg"
         density="compact"
         footer={
-          <>
-            <Button
-              variant="ghost"
-              icon={RotateCcw}
-              onClick={() => (editingDoc ? openEditModal(editingDoc) : setEditForm(EMPTY_EDIT))}
-            >
-              Reset
-            </Button>
-            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              loading={saveMutation.isPending}
-              disabled={editForm.fullName.trim().length < 5 || !editForm.email.trim()}
-              onClick={() => saveMutation.mutate()}
-            >
-              Save Changes
-            </Button>
-          </>
+          editStep === 1 ? (
+            <>
+              <Button
+                variant="ghost"
+                icon={RotateCcw}
+                onClick={() => (editingDoc ? openEditModal(editingDoc) : setEditForm(EMPTY_EDIT))}
+              >
+                Reset
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                icon={ArrowRight}
+                disabled={editForm.fullName.trim().length < 5 || !editForm.email.trim()}
+                onClick={() => setEditStep(2)}
+              >
+                Continue
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" icon={ArrowLeft} onClick={() => setEditStep(1)}>
+                Back
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                loading={saveMutation.isPending}
+                disabled={editForm.fullName.trim().length < 5 || !editForm.email.trim()}
+                onClick={() => saveMutation.mutate()}
+              >
+                Save Changes
+              </Button>
+            </>
+          )
         }
       >
         <div className="space-y-3">
-          {/* Photo */}
-          <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-            <ZoomableImage
-              src={editingPhoto}
-              alt={editForm.fullName ? `${editForm.fullName}'s profile photo` : 'Profile photo'}
-            >
-              <UserAvatar name={editForm.fullName || 'Doctor'} imageUrl={editingPhoto} size="lg" />
-            </ZoomableImage>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-text-main dark:text-white">Profile photo</p>
-              <p className="mt-0.5 text-xs text-slate-500">JPG, PNG or WebP. Max 512 KB.</p>
-              {editPhotoError && (
-                <p className="mt-1 text-xs text-status-cancelled-text" role="alert">
-                  {editPhotoError}
-                </p>
-              )}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  ref={editPhotoRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={handleEditPhotoChange}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  icon={Camera}
-                  onClick={() => editPhotoRef.current?.click()}
+          <StepIndicator
+            current={editStep}
+            steps={['Identity', 'Professional']}
+            onSelect={(n) => {
+              if (n < editStep) setEditStep(n === 1 ? 1 : 2);
+            }}
+          />
+
+          {editStep === 1 && (
+            <>
+              {/* Photo */}
+              <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-800/40">
+                <ZoomableImage
+                  src={editingPhoto}
+                  alt={editForm.fullName ? `${editForm.fullName}'s profile photo` : 'Profile photo'}
                 >
-                  {editPhoto || !editPhotoRemoved ? 'Change Photo' : 'Upload Photo'}
-                </Button>
-                {editPhoto && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    icon={Trash2}
-                    className="text-red-500 hover:text-red-700"
-                    onClick={() => {
-                      setEditPhoto(undefined);
-                      setEditPhotoRemoved(true);
-                    }}
-                  >
-                    Remove
-                  </Button>
-                )}
-                {editPhoto && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditPhoto(undefined);
-                      setEditPhotoError('');
-                      if (editPhotoRef.current) editPhotoRef.current.value = '';
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                )}
+                  <UserAvatar name={editForm.fullName || 'Doctor'} imageUrl={editingPhoto} size="lg" />
+                </ZoomableImage>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-text-main dark:text-white">Profile photo</p>
+                  <p className="mt-0.5 text-xs text-slate-500">JPG, PNG or WebP. Max 512 KB.</p>
+                  {editPhotoError && (
+                    <p className="mt-1 text-xs text-status-cancelled-text" role="alert">
+                      {editPhotoError}
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input
+                      ref={editPhotoRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleEditPhotoChange}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      icon={Camera}
+                      onClick={() => editPhotoRef.current?.click()}
+                    >
+                      {editPhoto || !editPhotoRemoved ? 'Change Photo' : 'Upload Photo'}
+                    </Button>
+                    {editPhoto && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        icon={Trash2}
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => {
+                          setEditPhoto(undefined);
+                          setEditPhotoRemoved(true);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                    {editPhoto && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditPhoto(undefined);
+                          setEditPhotoError('');
+                          if (editPhotoRef.current) editPhotoRef.current.value = '';
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Personal / contact */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              label="Full name"
-              value={editForm.fullName}
-              onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-              required
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={editForm.email}
-              onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-              required
-            />
-            <Input
-              label="Phone"
-              value={editForm.phone}
-              onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-            />
-            <Select
-              label="Account status"
-              options={editStatusOptions}
-              value={editForm.status}
-              onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-            />
-          </div>
+              {/* Personal / contact */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label="Full name"
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Phone"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                />
+                <Select
+                  label="Account status"
+                  options={editStatusOptions}
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                />
+              </div>
+            </>
+          )}
 
-          {/* Professional */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Select
-              label="Specialty"
-              options={specOptions}
-              value={editForm.specialization}
-              onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
-            />
-            <Select
-              label="Department"
-              options={deptOptions}
-              value={editForm.departmentId}
-              onChange={(e) => setEditForm({ ...editForm, departmentId: e.target.value })}
-            />
-            <Input
-              label="License number"
-              value={editForm.licenseNumber}
-              onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })}
-              placeholder="MED-12345"
-            />
-            <Input
-              label="Years of experience"
-              type="number"
-              min={0}
-              value={editForm.experienceYears}
-              onChange={(e) => setEditForm({ ...editForm, experienceYears: e.target.value })}
-            />
-            <Input
-              label="Consultation fee — new visit (RWF)"
-              type="number"
-              min={0}
-              value={editForm.newVisit}
-              onChange={(e) => setEditForm({ ...editForm, newVisit: e.target.value })}
-            />
-            <Input
-              label="Consultation fee — follow-up (RWF)"
-              type="number"
-              min={0}
-              value={editForm.followUp}
-              onChange={(e) => setEditForm({ ...editForm, followUp: e.target.value })}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="edit-doctor-bio"
-              className="mb-1 block text-xs font-medium text-text-main"
-            >
-              Bio
-            </label>
-            <textarea
-              id="edit-doctor-bio"
-              rows={2}
-              value={editForm.bio}
-              onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-              placeholder="Short professional summary shown to patients."
-              className="w-full rounded-xl border border-slate-200 bg-card px-3 py-2 text-sm text-text-main transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          {editStep === 2 && (
+            <>
+              {/* Professional */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Select
+                  label="Specialty"
+                  options={specOptions}
+                  value={editForm.specialization}
+                  onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
+                />
+                <Select
+                  label="Department"
+                  options={deptOptions}
+                  value={editForm.departmentId}
+                  onChange={(e) => setEditForm({ ...editForm, departmentId: e.target.value })}
+                />
+                <Input
+                  label="License number"
+                  value={editForm.licenseNumber}
+                  onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })}
+                  placeholder="MED-12345"
+                />
+                <Input
+                  label="Years of experience"
+                  type="number"
+                  min={0}
+                  value={editForm.experienceYears}
+                  onChange={(e) => setEditForm({ ...editForm, experienceYears: e.target.value })}
+                />
+                <Input
+                  label="Consultation fee — new visit (RWF)"
+                  type="number"
+                  min={0}
+                  value={editForm.newVisit}
+                  onChange={(e) => setEditForm({ ...editForm, newVisit: e.target.value })}
+                />
+                <Input
+                  label="Consultation fee — follow-up (RWF)"
+                  type="number"
+                  min={0}
+                  value={editForm.followUp}
+                  onChange={(e) => setEditForm({ ...editForm, followUp: e.target.value })}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-doctor-bio"
+                  className="mb-1 block text-xs font-medium text-text-main"
+                >
+                  Bio
+                </label>
+                <textarea
+                  id="edit-doctor-bio"
+                  rows={3}
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  placeholder="Short professional summary shown to patients."
+                  className="w-full rounded-xl border border-slate-200 bg-card px-3 py-2 text-sm text-text-main transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
@@ -1175,7 +1214,7 @@ export default function DoctorManagement() {
             Deactivate <strong>{deletingDoc ? `Dr. ${doctorUser(deletingDoc)?.fullName ?? ''}` : ''}</strong>?{' '}
             This doctor will no longer be able to sign in, but their profile and history are kept.
           </p>
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
             <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>
               Cancel
             </Button>
@@ -1204,7 +1243,7 @@ export default function DoctorManagement() {
             The sign-in account is left in place, but appointment history will no longer resolve to
             a doctor. This cannot be undone.
           </p>
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
             <Button variant="ghost" onClick={() => setIsRemoveModalOpen(false)}>
               Cancel
             </Button>

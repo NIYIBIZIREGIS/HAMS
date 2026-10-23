@@ -181,6 +181,12 @@ export async function updateDoctor(req: AuthRequest, res: Response) {
   success(res, 200, updated);
 }
 
+export async function getMyDoctor(req: AuthRequest, res: Response) {
+  const doctor = await Doctor.findOne({ userId: req.user?.id });
+  if (!doctor) throw new AppError(404, 'Doctor profile not found');
+  success(res, 200, doctor);
+}
+
 export async function getDoctorSchedule(req: AuthRequest, res: Response) {
   const doctor = await Doctor.findById(req.params.id);
   if (!doctor) throw new AppError(404, 'Doctor not found');

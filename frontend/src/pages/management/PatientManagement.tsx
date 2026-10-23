@@ -909,7 +909,7 @@ export function PatientManagement() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
               <Button
                 variant="outline"
                 icon={Pencil}
@@ -938,7 +938,7 @@ export function PatientManagement() {
           setShowEdit(false);
           setDetail(null);
         }}
-        title="Edit Patient"
+        title="Editing Patient"
         width="lg"
         density="compact"
         footer={

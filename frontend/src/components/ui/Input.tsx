@@ -54,7 +54,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
             htmlFor={inputId}
             className={
               auth
-                ? 'mb-1.5 block text-sm font-bold text-slate-700 dark:text-slate-200'
+                ? 'mb-1.5 block text-base font-bold text-slate-700 dark:text-slate-200'
                 : dense
                   ? 'mb-1 block text-xs font-medium text-text-main'
                   : 'mb-1.5 block text-sm font-medium text-text-main'
@@ -78,7 +78,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
 className={
               auth
                 ? [
-                        'w-full rounded-xl border-2 bg-white py-3 font-bold text-slate-900',
+                        'w-full rounded-xl border-2 bg-white py-3 text-[1rem] font-bold text-slate-900',
                         'placeholder:font-normal placeholder:text-slate-400',
                         'focus:outline-none focus:ring-4',
                         // Lift on focus is what makes the field feel alive; the transform is
@@ -92,7 +92,7 @@ className={
                       : 'border-slate-300 hover:border-slate-400 focus:border-primary-600 focus:ring-primary-100 dark:border-slate-600 dark:hover:border-slate-500 dark:focus:border-primary-400 dark:focus:ring-primary-950',
                     className,
                   ].join(' ')
-                : `w-full rounded-xl border bg-card text-sm text-text-main placeholder:text-text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+                : `w-full rounded-xl border bg-card text-[1rem] text-text-main placeholder:text-text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm ${
                     dense ? 'py-2' : 'py-2.5'
                   } ${
                     dense ? (Icon ? 'pl-9 pr-3' : 'px-3') : Icon ? 'pl-10 pr-3.5' : 'px-3.5'

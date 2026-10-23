@@ -31,24 +31,24 @@ export function ConfirmDialog({
   // those ancestors carry `backdrop-blur`, z-index stacking contexts and fixed positioning —
   // which trap a plain `position: fixed` overlay and clip it so the dialog never appears.
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden px-4 pb-3 pt-6">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden pt-4 sm:items-start sm:px-4 sm:pb-3 sm:pt-6">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
-        className="relative flex w-full max-w-sm flex-col overflow-hidden rounded-xl border border-slate-200 bg-card shadow-md max-h-[calc(100dvh-2.25rem)]"
+        className="relative flex w-full max-w-sm flex-col overflow-hidden rounded-xl border border-slate-200 bg-card shadow-md max-h-[calc(100dvh-1rem)] animate-modal-in sm:max-h-[calc(100dvh-2.25rem)]"
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className="shrink-0 px-6 pt-6">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-status-cancelled-bg">
-            <AlertTriangle className="h-6 w-6 text-status-cancelled-text" />
+        <div className="shrink-0 px-4 pt-5 sm:px-6 sm:pt-6">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-status-cancelled-bg sm:mb-4 sm:h-12 sm:w-12">
+            <AlertTriangle className="h-5 w-5 text-status-cancelled-text sm:h-6 sm:w-6" />
           </div>
           <h3 className="text-base font-semibold text-text-main">{title}</h3>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-2 pt-2">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2 pt-2 sm:px-6">
           <p className="text-sm text-text-muted">{message}</p>
         </div>
-        <div className="flex shrink-0 justify-end gap-3 px-6 pb-6 pt-4">
+        <div className="flex shrink-0 flex-row justify-end gap-2 px-4 pb-4 pt-2 sm:gap-3 sm:px-6 sm:pb-6 sm:pt-4 [&>*]:w-auto">
           <Button variant="ghost" onClick={onClose} disabled={loading}>
             {cancelLabel}
           </Button>

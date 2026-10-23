@@ -281,6 +281,11 @@ export async function deletePatient(id: string): Promise<void> {
   await client.delete(`/patients/${id}`);
 }
 
+export async function getMyDoctorProfile(): Promise<Doctor> {
+  const res = await client.get('/doctors/mine');
+  return res.data.data as Doctor;
+}
+
 export async function getDoctorSchedule(doctorId: string): Promise<DoctorScheduleEntry[]> {
   const res = await client.get(`/doctors/${doctorId}/schedule`);
   return res.data.data as DoctorScheduleEntry[];
@@ -289,6 +294,10 @@ export async function getDoctorSchedule(doctorId: string): Promise<DoctorSchedul
 export async function upsertSchedule(doctorId: string, payload: Partial<DoctorScheduleEntry>) {
   const res = await client.post(`/doctors/${doctorId}/schedule`, payload);
   return res.data.data as DoctorScheduleEntry;
+}
+
+export async function deleteSchedule(doctorId: string, scheduleId: string): Promise<void> {
+  await client.delete(`/doctors/${doctorId}/schedule/${scheduleId}`);
 }
 
 export async function getAvailability(doctorId: string, date: string): Promise<AvailableSlot[]> {

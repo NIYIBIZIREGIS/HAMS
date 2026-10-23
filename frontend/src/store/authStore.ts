@@ -22,6 +22,7 @@ interface AuthState {
   sendPhoneCode: (phone?: string) => Promise<VerificationResponse>;
   verifyPhoneCode: (code: string, phone?: string) => Promise<User>;
   updateProfileImage: (image: string | null) => Promise<User>;
+  updateProfile: (payload: { fullName?: string; phone?: string }) => Promise<User>;
   logout: () => Promise<void>;
 }
 
@@ -45,6 +46,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   updateProfileImage: async (image) => {
     const user = await authService.updateProfileImage(image);
+    localStorage.setItem('has_user', JSON.stringify(user));
+    set({ user });
+    return user;
+  },
+
+  updateProfile: async (payload) => {
+    const user = await authService.updateProfile(payload);
     localStorage.setItem('has_user', JSON.stringify(user));
     set({ user });
     return user;

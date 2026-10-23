@@ -124,6 +124,11 @@ export const profileImageSchema = z.object({
   image: clearableProfileImage,
 });
 
+export const updateProfileSchema = z.object({
+  fullName: z.string().trim().min(2).max(200).optional(),
+  phone: z.union([phoneSchema, z.literal('')]).optional(),
+});
+
 export const verifyEmailSendSchema = z.object({
   email: z.string().email('Invalid email').optional(),
 });

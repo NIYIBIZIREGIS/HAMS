@@ -4,13 +4,19 @@ import { useTranslation } from 'react-i18next';
 import {
   getDoctorSchedule,
   upsertSchedule,
+  deleteSchedule,
   getAvailability,
+  getMyDoctorProfile,
+  listDoctors,
+  type Doctor,
   type DoctorScheduleEntry,
 } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageSpinner } from '../../components/ui/Spinner';
 import {
@@ -83,9 +89,8 @@ export function AvailabilityManager() {
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [selectedDoctorId, setSelectedDoctorId] = useState('');
 
   // Multi-day selection for creating multiple entries at once
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
@@ -99,16 +104,40 @@ export function AvailabilityManager() {
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data: schedule, isLoading } = useQuery({
-    queryKey: ['schedule', user?.id],
-    queryFn: () => getDoctorSchedule(user!.id),
-    enabled: !!user,
+  const isDoctor = user?.role === 'doctor';
+
+  // The authenticated user id and the Doctor profile id are different records. Resolving the
+  // profile first is what makes a doctor's own schedule addressable at all.
+  const { data: myDoctor, isLoading: myDoctorLoading } = useQuery<Doctor>({
+    queryKey: ['my-doctor'],
+    queryFn: getMyDoctorProfile,
+    enabled: isDoctor,
+  });
+
+  const { data: doctors = [], isLoading: doctorsLoading } = useQuery<Doctor[]>({
+    queryKey: ['doctors'],
+    queryFn: listDoctors,
+    enabled: !isDoctor,
+  });
+
+  const activeDoctorId = isDoctor ? myDoctor?._id ?? '' : selectedDoctorId || doctors[0]?._id || '';
+
+  useEffect(() => {
+    if (!isDoctor && !selectedDoctorId && doctors.length > 0) {
+      setSelectedDoctorId(doctors[0]._id);
+    }
+  }, [isDoctor, selectedDoctorId, doctors]);
+
+  const { data: schedule, isLoading: scheduleLoading } = useQuery({
+    queryKey: ['schedule', activeDoctorId],
+    queryFn: () => getDoctorSchedule(activeDoctorId),
+    enabled: !!activeDoctorId,
   });
 
   const { data: slots } = useQuery({
-    queryKey: ['availability', user?.id, selectedDate],
-    queryFn: () => getAvailability(user!.id, selectedDate),
-    enabled: !!user,
+    queryKey: ['availability', activeDoctorId, selectedDate],
+    queryFn: () => getAvailability(activeDoctorId, selectedDate),
+    enabled: !!activeDoctorId,
   });
 
   // Group schedule by day of week for the weekly view
@@ -121,13 +150,14 @@ export function AvailabilityManager() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async () => {
+      if (!activeDoctorId) throw new Error('Select a doctor first.');
       const days =
         selectedDays.size > 0
           ? Array.from(selectedDays).map(Number)
           : [parseInt(form.dayOfWeek, 10)];
 
       for (const day of days) {
-        await upsertSchedule(user!.id, {
+        await upsertSchedule(activeDoctorId, {
           dayOfWeek: day,
           startTime: form.startTime,
           endTime: form.endTime,
@@ -140,22 +170,21 @@ export function AvailabilityManager() {
       }
     },
     onSuccess: () => {
-      setInfo(t('doctor.availabilitySaved', 'Availability saved successfully'));
-      setError('');
+      toast.success(t('doctor.availabilitySaved', 'Availability saved successfully.'));
       setSelectedDays(new Set());
       setForm(EMPTY_FORM);
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
       queryClient.invalidateQueries({ queryKey: ['availability'] });
     },
     onError: (err: Error) => {
-      setError(err.message || t('doctor.saveFailed', 'Failed to save availability'));
+      toast.error(err.message || t('doctor.saveFailed', 'Failed to save availability'));
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      upsertSchedule(user!.id, {
-        ...(editingEntry ? { dayOfWeek: editingEntry.dayOfWeek } : {}),
+    mutationFn: async () => {
+      if (!activeDoctorId) throw new Error('Select a doctor first.');
+      await upsertSchedule(activeDoctorId, {
         dayOfWeek: parseInt(editForm.dayOfWeek, 10),
         startTime: editForm.startTime,
         endTime: editForm.endTime,
@@ -164,48 +193,35 @@ export function AvailabilityManager() {
         slotDurationMinutes: parseInt(editForm.slotDurationMinutes, 10),
         maxPatientsPerSlot: parseInt(editForm.maxPatientsPerSlot, 10),
         isActive: editForm.isActive,
-      }),
+      });
+    },
     onSuccess: () => {
-      setInfo(t('doctor.availabilityUpdated', 'Availability updated'));
-      setError('');
+      toast.success(t('doctor.availabilityUpdated', 'Availability updated.'));
       setEditModalOpen(false);
       setEditingEntry(null);
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
       queryClient.invalidateQueries({ queryKey: ['availability'] });
     },
     onError: (err: Error) => {
-      setError(err.message || t('doctor.updateFailed', 'Failed to update availability'));
+      toast.error(err.message || t('doctor.updateFailed', 'Failed to update availability'));
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/v1/doctors/${user!.id}/schedule/${id}`, {
-        method: 'DELETE',
-      }).then((res) => {
-        if (!res.ok) throw new Error('Delete failed');
-      }),
+    mutationFn: (id: string) => {
+      if (!activeDoctorId) throw new Error('Select a doctor first.');
+      return deleteSchedule(activeDoctorId, id);
+    },
     onSuccess: () => {
-      setInfo(t('doctor.availabilityDeleted', 'Availability deleted'));
+      toast.success(t('doctor.availabilityDeleted', 'Availability deleted.'));
       setDeleteId(null);
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
       queryClient.invalidateQueries({ queryKey: ['availability'] });
     },
     onError: (err: Error) => {
-      setError(err.message || t('doctor.deleteFailed', 'Failed to delete'));
+      toast.error(err.message || t('doctor.deleteFailed', 'Failed to delete'));
     },
   });
-
-  // Auto-clear messages
-  useEffect(() => {
-    if (info || error) {
-      const timer = setTimeout(() => {
-        setInfo('');
-        setError('');
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [info, error]);
 
   const openEditModal = (entry: DoctorScheduleEntry) => {
     setEditingEntry(entry);
@@ -229,7 +245,8 @@ export function AvailabilityManager() {
     });
   };
 
-  if (isLoading) return <PageSpinner />;
+  const waitingForDoctor = isDoctor ? myDoctorLoading : doctorsLoading;
+  if (waitingForDoctor || (!!activeDoctorId && scheduleLoading)) return <PageSpinner />;
 
   return (
     <div className="space-y-6">
@@ -243,18 +260,38 @@ export function AvailabilityManager() {
             {t('doctor.availabilitySubtitle', 'Manage your weekly schedule and time slots')}
           </p>
         </div>
+        {!isDoctor && doctors.length > 0 && (
+          <div className="w-full sm:w-64">
+            <Select
+              label="Doctor"
+              value={activeDoctorId}
+              onChange={(e) => setSelectedDoctorId(e.target.value)}
+              options={doctors.map((d: any) => {
+                const name = d.userId && typeof d.userId === 'object' ? d.userId.fullName : d.fullName ?? 'Doctor';
+                return { value: d._id, label: name };
+              })}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Messages */}
-      {info && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {info}
-        </div>
+      {isDoctor && !myDoctor && !myDoctorLoading && (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-slate-600">
+              Your doctor profile was not found. Ask your facility administrator to create it.
+            </p>
+          </CardBody>
+        </Card>
       )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
+      {!isDoctor && !activeDoctorId && !doctorsLoading && (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-slate-600">
+              No doctor profiles are registered in your facility yet. Create a doctor profile first.
+            </p>
+          </CardBody>
+        </Card>
       )}
 
       <div className="grid gap-6 xl:grid-cols-3">
@@ -322,7 +359,7 @@ export function AvailabilityManager() {
             )}
 
             {/* Time Fields */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
                 label={t('doctor.startTime', 'Start Time')}
                 type="time"
@@ -339,7 +376,7 @@ export function AvailabilityManager() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
                 label={t('doctor.breakStart', 'Break Start')}
                 type="time"
@@ -354,7 +391,7 @@ export function AvailabilityManager() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
                 label={t('doctor.slotDuration', 'Slot Duration (min)')}
                 type="number"
@@ -399,6 +436,7 @@ export function AvailabilityManager() {
             <Button
               onClick={() => createMutation.mutate()}
               loading={createMutation.isPending}
+              disabled={!activeDoctorId}
               icon={Plus}
               className="w-full"
             >
@@ -682,7 +720,7 @@ export function AvailabilityManager() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label={t('doctor.startTime', 'Start Time')}
               type="time"
@@ -697,7 +735,7 @@ export function AvailabilityManager() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label={t('doctor.breakStart', 'Break Start')}
               type="time"
@@ -712,7 +750,7 @@ export function AvailabilityManager() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label={t('doctor.slotDuration', 'Slot Duration (min)')}
               type="number"

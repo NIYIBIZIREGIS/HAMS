@@ -94,6 +94,11 @@ export async function updateProfileImage(image: string | null): Promise<User> {
   return res.data.data.user as User;
 }
 
+export async function updateProfile(payload: { fullName?: string; phone?: string }): Promise<User> {
+  const res = await client.put('/auth/profile', payload);
+  return res.data.data.user as User;
+}
+
 export async function logout(refreshToken: string) {
   await client.post('/auth/logout', { refreshToken });
 }

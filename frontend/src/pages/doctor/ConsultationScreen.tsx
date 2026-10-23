@@ -387,7 +387,7 @@ export function ConsultationScreen() {
                   <div key={i} className="flex items-center gap-2">
                     <input
                       type="text"
-                      className="flex-1 rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                      className="flex-1 rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-[1rem] text-slate-900 sm:text-sm placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                       value={d}
                       onChange={(e) => { const u = [...diagnoses]; u[i] = e.target.value; setDiagnoses(u); }}
                       placeholder={t('consultation.diagnosisPlaceholder', 'Enter diagnosis...')}
@@ -409,14 +409,14 @@ export function ConsultationScreen() {
               <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="treatment">
                 {t('consultation.treatment', 'Treatment Plan')}
               </label>
-              <textarea id="treatment" rows={3} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20" value={treatment} onChange={(e) => setTreatment(e.target.value)} placeholder={t('consultation.treatmentPlaceholder', 'Describe treatment plan...')} />
+              <textarea id="treatment" rows={3} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-[1rem] text-slate-900 sm:text-sm placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20" value={treatment} onChange={(e) => setTreatment(e.target.value)} placeholder={t('consultation.treatmentPlaceholder', 'Describe treatment plan...')} />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="notes">
                 <StickyNote className="mr-1 inline h-3.5 w-3.5 text-slate-400" />
                 {t('consultation.notes', 'Clinical Notes')}
               </label>
-              <textarea id="notes" rows={4} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('consultation.notesPlaceholder', 'Additional observations...')} />
+              <textarea id="notes" rows={4} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-[1rem] text-slate-900 sm:text-sm placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('consultation.notesPlaceholder', 'Additional observations...')} />
             </div>
             <Input label={t('consultation.followUpDate', 'Follow-up Date')} type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
             {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">{error}</div>}
@@ -457,7 +457,7 @@ export function ConsultationScreen() {
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     {t('consultation.prescriptionInstructions', 'General Instructions')}
                   </label>
-                  <textarea rows={3} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20" value={prescriptionInstructions} onChange={(e) => setPrescriptionInstructions(e.target.value)} placeholder={t('consultation.prescriptionInstructionsHint', 'e.g. Take after meals...')} />
+                  <textarea rows={3} className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-[1rem] text-slate-900 sm:text-sm placeholder-slate-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20" value={prescriptionInstructions} onChange={(e) => setPrescriptionInstructions(e.target.value)} placeholder={t('consultation.prescriptionInstructionsHint', 'e.g. Take after meals...')} />
                 </div>
                 {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">{error}</div>}
                 <div className="flex justify-between gap-2 border-t border-slate-100 pt-4">

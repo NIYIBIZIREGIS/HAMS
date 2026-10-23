@@ -10,7 +10,6 @@ export function PortalLayout() {
 
   useEffect(() => {
     setMobileOpen(false);
-    window.scrollTo({ top: 0 });
   }, [location.pathname]);
 
   return (
@@ -27,7 +26,11 @@ export function PortalLayout() {
         }`}
       >
         <PortalHeader onOpenMobile={() => setMobileOpen(true)} />
-        <main key={location.pathname} className="flex-1 px-4 py-6 animate-page-in md:px-6 md:py-8">
+        <main
+          key={location.pathname}
+          data-scroll-root
+          className="flex-1 px-3 py-4 animate-page-in sm:px-4 md:px-6 md:py-6 lg:py-8"
+        >
           <Outlet />
         </main>
       </div>

@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { Types } from 'mongoose';
 import { AuthRequest } from '../middleware/auth';
-import { User, Patient, RefreshToken, Facility, nextSeq } from '../models';
+import { User, Patient, RefreshToken, Facility, nextSeq, Notification } from '../models';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, sha256 } from '../utils/tokens';
 import { hashPassword, comparePassword } from '../utils/password';
 import { issueCode, verifyCode } from '../services/verification';
@@ -119,6 +119,27 @@ export async function updateProfileImage(req: AuthRequest, res: Response) {
   success(res, 200, { user: buildPublicUser(user) });
 }
 
+export async function updateProfile(req: AuthRequest, res: Response) {
+  const user = await User.findById(req.user?.id);
+  if (!user) throw new AppError(404, 'User not found');
+
+  const { fullName, phone } = req.body as { fullName?: string; phone?: string };
+  if (fullName) user.fullName = fullName.trim();
+  if (phone !== undefined) {
+    const next = phone.trim();
+    if (next !== (user.phone ?? '')) {
+      // Clearing the field must unset it; an empty string would collide with the
+      // unique index for every other account that has no phone number.
+      user.phone = next || undefined;
+      // A re-typed number is unverified until the owner proves it again.
+      user.phoneVerifiedAt = undefined;
+    }
+  }
+
+  await user.save();
+  success(res, 200, { user: buildPublicUser(user) });
+}
+
 export async function register(req: AuthRequest, res: Response) {
   const body = req.body as RegisterBody;
 
@@ -170,6 +191,20 @@ export async function register(req: AuthRequest, res: Response) {
       isPrimary: true,
       registeredBy: user._id,
     });
+  }
+
+  try {
+    await Notification.create({
+      patientId: patient._id,
+      facilityId: chosenFacilityId ? new Types.ObjectId(chosenFacilityId) : undefined,
+      recipientType: 'patient',
+      type: 'general',
+      title: 'Welcome to HAS',
+      body: 'Thank you for registering with Hospital Appointments Management System. You can now book appointments and access services.',
+      link: '/dashboard',
+    });
+  } catch (err) {
+    console.error('[notification] welcome notification failed:', err instanceof Error ? err.message : err);
   }
 
   const verification = { emailDelivered: false, smsDelivered: false };

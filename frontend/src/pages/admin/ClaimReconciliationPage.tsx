@@ -47,7 +47,7 @@ export function ClaimReconciliationPage() {
 
   const loadSummary = useCallback(async () => {
     try {
-      const all = await getClaimReconciliation({ limit: 200 });
+      const all = await getClaimReconciliation({ limit: 100 });
       setSummary(all);
     } catch {
       setSummary([]);
@@ -60,11 +60,11 @@ export function ClaimReconciliationPage() {
     setLoading(true);
     setError('');
     try {
-      const params: Record<string, unknown> = { limit: 200 };
+      const params: Record<string, unknown> = { limit: 100 };
       if (status) params.status = status;
       if (providerFilter) params.providerId = providerFilter;
-      if (from) params.from = from;
-      if (to) params.to = to;
+      if (from) params.from = new Date(`${from}T00:00:00`).toISOString();
+      if (to) params.to = new Date(`${to}T00:00:00`).toISOString();
       setRows(await getClaimReconciliation(params));
     } catch {
       setError('Unable to load reconciliation data.');

@@ -12,13 +12,12 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  AlertCircle,
-  CheckCircle2,
-  X,
   Users,
   Pencil,
   ShieldCheck,
   RotateCcw,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { client, getErrorMessage } from '../../services/client';
 import {
@@ -36,6 +35,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
+import { StepIndicator } from '../../components/ui/StepIndicator';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Spinner } from '../../components/ui/Spinner';
 import { UserAvatar } from '../../components/ui/UserAvatar';
@@ -102,7 +102,7 @@ export function UsersPage() {
   const [reassignUser, setReassignUser] = useState<StaffUser | null>(null);
   const [reassignFacility, setReassignFacility] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [editStep, setEditStep] = useState(1);
 
   const { data: users, isLoading: usersLoading } = useQuery<StaffUser[]>({
     queryKey: ['users'],
@@ -138,8 +138,8 @@ export function UsersPage() {
   );
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
-    setFeedback({ type, message });
-    setTimeout(() => setFeedback(null), 4000);
+    if (type === 'success') toast.success(message);
+    else toast.error(message);
   };
 
   const createMutation = useMutation({
@@ -213,6 +213,7 @@ export function UsersPage() {
 
   const openEdit = (user: StaffUser) => {
     setEditing({ ...user, facilityId: user.facilityId ?? '' });
+    setEditStep(1);
     setShowEdit(true);
     setActiveMenu(null);
   };
@@ -258,27 +259,6 @@ export function UsersPage() {
           Create User
         </Button>
       </div>
-
-      {/* Feedback */}
-      {feedback && (
-        <div
-          className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
-            feedback.type === 'success'
-              ? 'border-status-confirmed-bg bg-status-confirmed-bg text-status-confirmed-text'
-              : 'border-status-cancelled-bg bg-status-cancelled-bg text-status-cancelled-text'
-          }`}
-        >
-          {feedback.type === 'success' ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertCircle className="h-4 w-4 shrink-0" />
-          )}
-          {feedback.message}
-          <button onClick={() => setFeedback(null)} className="ml-auto">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* Summary Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -613,92 +593,126 @@ export function UsersPage() {
         onClose={() => {
           setShowEdit(false);
           setEditing(null);
+          setEditStep(1);
         }}
         title="Edit User"
         width="lg"
         density="compact"
         footer={
           editing ? (
-            <>
-              <Button
-                variant="ghost"
-                icon={RotateCcw}
-                onClick={() => {
-                  const orig = users?.find((u) => u._id === editing._id);
-                  if (orig) setEditing({ ...orig, facilityId: orig.facilityId ?? '' });
-                }}
-              >
-                Clear
-              </Button>
-              <Button variant="outline" onClick={() => setShowEdit(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                icon={Pencil}
-                loading={editMutation.isPending}
-                onClick={() =>
-                  editMutation.mutate({
-                    id: editing._id,
-                    payload: {
-                      fullName: editing.fullName,
-                      email: editing.email,
-                      phone: editing.phone || undefined,
-                      role: editing.role,
-                      facilityId: editing.facilityId
-                        ? (editing.facilityId as string)
-                        : undefined,
-                    },
-                  })
-                }
-              >
-                Save Changes
-              </Button>
-            </>
+            editStep === 1 ? (
+              <>
+                <Button
+                  variant="ghost"
+                  icon={RotateCcw}
+                  onClick={() => {
+                    const orig = users?.find((u) => u._id === editing._id);
+                    if (orig) setEditing({ ...orig, facilityId: orig.facilityId ?? '' });
+                  }}
+                >
+                  Clear
+                </Button>
+                <Button variant="outline" onClick={() => setShowEdit(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  icon={ArrowRight}
+                  disabled={!editing.fullName.trim() || !editing.email?.trim()}
+                  onClick={() => setEditStep(2)}
+                >
+                  Continue
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" icon={ArrowLeft} onClick={() => setEditStep(1)}>
+                  Back
+                </Button>
+                <Button variant="outline" onClick={() => setShowEdit(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  icon={Pencil}
+                  loading={editMutation.isPending}
+                  onClick={() =>
+                    editMutation.mutate({
+                      id: editing._id,
+                      payload: {
+                        fullName: editing.fullName,
+                        email: editing.email,
+                        phone: editing.phone || undefined,
+                        role: editing.role,
+                        facilityId: editing.facilityId
+                          ? (editing.facilityId as string)
+                          : undefined,
+                      },
+                    })
+                  }
+                >
+                  Save Changes
+                </Button>
+              </>
+            )
           ) : undefined
         }
       >
         {editing ? (
           <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                label="Full name"
-                value={editing.fullName}
-                onChange={(e) => setEditing({ ...editing, fullName: e.target.value })}
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={editing.email ?? ''}
-                onChange={(e) => setEditing({ ...editing, email: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                label="Phone"
-                value={editing.phone ?? ''}
-                onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
-              />
-              <Select
-                label="Role"
-                options={roleOptions}
-                value={editing.role}
-                onChange={(e) => setEditing({ ...editing, role: e.target.value })}
-              />
-            </div>
-
-            <Select
-              label="Facility (optional)"
-              options={[
-                { value: '', label: '— No facility —' },
-                ...(facilities ?? [])
-                  .filter((f) => f.isActive)
-                  .map((f) => ({ value: f._id, label: f.name })),
-              ]}
-              value={editing.facilityId ?? ''}
-              onChange={(e) =>
-                setEditing({ ...editing, facilityId: e.target.value || null })
-              }
+            <StepIndicator
+              current={editStep}
+              steps={['Account', 'Role & Facility']}
+              onSelect={(n) => {
+                if (n < editStep) setEditStep(n === 1 ? 1 : 2);
+              }}
             />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {editStep === 1
+                ? 'Update the name and contact details this user signs in with.'
+                : 'Set what this user can do and which hospital they belong to.'}
+            </p>
+
+            {editStep === 1 ? (
+              <div className="space-y-3">
+                <Input
+                  label="Full name"
+                  value={editing.fullName}
+                  onChange={(e) => setEditing({ ...editing, fullName: e.target.value })}
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={editing.email ?? ''}
+                  onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+                />
+                <Input
+                  label="Phone"
+                  value={editing.phone ?? ''}
+                  onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Select
+                  label="Role"
+                  options={roleOptions}
+                  value={editing.role}
+                  onChange={(e) => setEditing({ ...editing, role: e.target.value })}
+                />
+                <Select
+                  label="Facility (optional)"
+                  options={[
+                    { value: '', label: '— No facility —' },
+                    ...(facilities ?? [])
+                      .filter((f) => f.isActive)
+                      .map((f) => ({ value: f._id, label: f.name })),
+                  ]}
+                  value={editing.facilityId ?? ''}
+                  onChange={(e) =>
+                    setEditing({ ...editing, facilityId: e.target.value || null })
+                  }
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div className="py-8 text-center text-slate-400">User not found</div>

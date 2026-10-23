@@ -1,6 +1,7 @@
 import { Response } from 'express';
+import { Types } from 'mongoose';
 import { AuthRequest } from '../middleware/auth';
-import { Appointment, Doctor, Patient, APPOINTMENT_STATUSES, type AppointmentStatus } from '../models';
+import { Appointment, Doctor, Patient, APPOINTMENT_STATUSES, type AppointmentStatus, Notification, User } from '../models';
 import { success, paginate } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 import { bookAppointment, assertValidTransition, nextQueueNumber } from '../services/bookingService';
@@ -172,6 +173,35 @@ export async function createAppointment(req: AuthRequest, res: Response) {
   // hospital the patient's home unless they had none.
   await grantMembership(patientId, facilityId, { registeredBy: req.user?.id });
 
+  try {
+    const doc = await Doctor.findById(body.doctorId).select('userId facilityId');
+    const doctorUserId = doc?.userId;
+    // Notify doctor
+    if (doc && doctorUserId) {
+      await Notification.create({
+        doctorId: doc._id,
+        facilityId: doc.facilityId || facilityId,
+        recipientType: 'doctor',
+        type: 'appointment',
+        title: 'New appointment request',
+        body: `A patient has requested an appointment on ${new Date(body.appointmentDate).toLocaleDateString()} at ${body.timeSlot}.`,
+        link: '/appointments',
+      });
+    }
+    // Notify patient
+    await Notification.create({
+      patientId,
+      facilityId,
+      recipientType: 'patient',
+      type: 'appointment',
+      title: 'Appointment requested',
+      body: `Your appointment request has been submitted for ${new Date(body.appointmentDate).toLocaleDateString()} at ${body.timeSlot}.`,
+      link: '/appointments',
+    });
+  } catch (err) {
+    console.error('[notification] appointment create notify failed:', err instanceof Error ? err.message : err);
+  }
+
   success(res, 201, appointment);
 }
 
@@ -230,6 +260,39 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     new: true,
     runValidators: true,
   });
+  try {
+    if (body.status) {
+      const apptFull = await Appointment.findById(req.params.id).populate('patientId').populate('doctorId');
+      if (apptFull) {
+        const p = apptFull.patientId as any;
+        const d = apptFull.doctorId as any;
+        if (p && p._id) {
+          await Notification.create({
+            patientId: p._id,
+            facilityId: apptFull.facilityId,
+            recipientType: 'patient',
+            type: 'appointment',
+            title: `Appointment ${body.status}`,
+            body: `Your appointment status has been updated to ${body.status}.`,
+            link: '/appointments',
+          });
+        }
+        if (d && d._id) {
+          await Notification.create({
+            doctorId: d._id,
+            facilityId: apptFull.facilityId,
+            recipientType: 'doctor',
+            type: 'appointment',
+            title: `Appointment ${body.status}`,
+            body: `An appointment status has been updated to ${body.status}.`,
+            link: '/appointments',
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[notification] appointment status notify failed:', err instanceof Error ? err.message : err);
+  }
   success(res, 200, updated);
 }
 
@@ -248,6 +311,37 @@ export async function checkIn(req: AuthRequest, res: Response) {
     { status: 'Checked In', checkInTime: new Date(), queueNumber },
     { new: true }
   );
+  try {
+    const apptFull = await Appointment.findById(req.params.id).populate('patientId').populate('doctorId');
+    if (apptFull) {
+      const p = apptFull.patientId as any;
+      const d = apptFull.doctorId as any;
+      if (p && p._id) {
+        await Notification.create({
+          patientId: p._id,
+          facilityId: apptFull.facilityId,
+          recipientType: 'patient',
+          type: 'appointment',
+          title: 'Appointment checked in',
+          body: 'Your appointment has been checked in.',
+          link: '/appointments',
+        });
+      }
+      if (d && d._id) {
+        await Notification.create({
+          doctorId: d._id,
+          facilityId: apptFull.facilityId,
+          recipientType: 'doctor',
+          type: 'appointment',
+          title: 'Appointment checked in',
+          body: 'An appointment has been checked in.',
+          link: '/appointments',
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[notification] checkin notify failed:', err instanceof Error ? err.message : err);
+  }
   success(res, 200, updated);
 }
 
@@ -263,6 +357,37 @@ export async function cancelAppointment(req: AuthRequest, res: Response) {
     { status: 'Cancelled', cancellationReason: body.cancellationReason ?? '' },
     { new: true }
   );
+  try {
+    const apptFull = await Appointment.findById(req.params.id).populate('patientId').populate('doctorId');
+    if (apptFull) {
+      const p = apptFull.patientId as any;
+      const d = apptFull.doctorId as any;
+      if (p && p._id) {
+        await Notification.create({
+          patientId: p._id,
+          facilityId: apptFull.facilityId,
+          recipientType: 'patient',
+          type: 'appointment',
+          title: 'Appointment cancelled',
+          body: 'Your appointment has been cancelled.',
+          link: '/appointments',
+        });
+      }
+      if (d && d._id) {
+        await Notification.create({
+          doctorId: d._id,
+          facilityId: apptFull.facilityId,
+          recipientType: 'doctor',
+          type: 'appointment',
+          title: 'Appointment cancelled',
+          body: 'An appointment has been cancelled.',
+          link: '/appointments',
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[notification] cancel notify failed:', err instanceof Error ? err.message : err);
+  }
   success(res, 200, updated);
 }
 

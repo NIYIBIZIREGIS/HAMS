@@ -235,7 +235,7 @@ export function ReceptionistDashboard() {
               </p>
             </div>
           ) : (
-            <div className="-mx-5 overflow-x-auto pb-1">
+            <div className="-mx-4 overflow-x-auto pb-1 sm:-mx-5">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wider text-slate-500">

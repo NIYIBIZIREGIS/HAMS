@@ -15,7 +15,7 @@ export function AdminLayout() {
         }`}
       >
         <AdminHeader />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main data-scroll-root className="flex-1 overflow-y-auto p-3 sm:p-6">
           <Outlet />
         </main>
       </div>

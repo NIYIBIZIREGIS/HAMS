@@ -49,6 +49,7 @@ import StaffManagement from './pages/admin/StaffManagement';
 import { PatientManagement } from './pages/management/PatientManagement';
 import { UsersPage } from './pages/superadmin/UsersPage';
 import { ToastHost } from './components/ui/ToastHost';
+import { ScrollToTop } from './components/ScrollToTop';
 import { useAuthStore } from './store/authStore';
 
 const queryClient = new QueryClient({
@@ -67,6 +68,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastHost />
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           {/* Public routes with regular navbar */}
           <Route element={<AppLayout />}>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { DensityContext, type Density } from './density';
 
@@ -57,40 +58,41 @@ export function Modal({
 
   if (!visible) return null;
 
-  return (
+  return createPortal(
     <DensityContext.Provider value={density}>
       <div
         ref={overlayRef}
-        className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden px-4 pb-3 pt-6"
+        className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden px-2 pb-2 pt-2 sm:px-4 sm:pb-3 sm:pt-6"
         onClick={(e) => e.target === overlayRef.current && onClose()}
       >
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
         <div
-          className={`relative flex max-h-[calc(100dvh-2.25rem)] w-full flex-col ${widthClasses[width]} rounded-xl border border-slate-200 bg-card shadow-md animate-in fade-in zoom-in-95`}
+          className={`relative flex max-h-[calc(100dvh-1rem)] w-full flex-col rounded-xl border border-slate-200 bg-card shadow-md animate-modal-in sm:max-h-[calc(100dvh-2.25rem)] ${widthClasses[width]}`}
           role="dialog"
           aria-modal="true"
           aria-label={title}
         >
           {title && (
-            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-4 py-3 sm:px-5">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-5 sm:py-3">
               <h2 className="min-w-0 truncate text-base font-semibold text-text-main">{title}</h2>
               <button
                 onClick={onClose}
-                className="shrink-0 rounded-xl p-1.5 text-text-muted hover:bg-slate-100 hover:text-text-main"
+                className="shrink-0 rounded-lg p-1.5 text-text-muted hover:bg-slate-100 hover:text-text-main"
                 aria-label="Close"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
           )}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4">{children}</div>
           {footer && (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:px-5">
+            <div className="flex shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-3 py-2.5 sm:px-5 sm:py-3 [&>*]:w-auto">
               {footer}
             </div>
           )}
         </div>
       </div>
-    </DensityContext.Provider>
+    </DensityContext.Provider>,
+    document.body,
   );
 }

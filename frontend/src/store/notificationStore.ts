@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export interface AppNotification {
   id: string;
-  type: 'appointment' | 'system' | 'prescription' | 'message';
+  type: 'appointment' | 'system' | 'prescription' | 'message' | 'lab_result' | 'billing' | 'general';
   title: string;
   message: string;
   time: string;
@@ -12,37 +12,17 @@ export interface AppNotification {
 
 interface NotificationsState {
   notifications: AppNotification[];
+  setNotifications: (n: AppNotification[]) => void;
   addNotification: (n: Omit<AppNotification, 'id' | 'read' | 'time'>) => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
   clear: () => void;
 }
 
-const seed: Omit<AppNotification, 'id' | 'read'>[] = [
-  {
-    type: 'appointment',
-    title: 'Appointment confirmed',
-    message: 'Your appointment with Dr. Uwera for tomorrow at 09:00 has been confirmed.',
-    time: '2 hours ago',
-    to: '/appointments',
-  },
-  {
-    type: 'prescription',
-    title: 'Prescription issued',
-    message: 'Dr. Mugisha issued a new prescription. You can view it in your medical history.',
-    time: '1 day ago',
-    to: '/medical-history',
-  },
-  {
-    type: 'system',
-    title: 'Welcome to HAS',
-    message: 'Thank you for using the Hospital Appointments Management System.',
-    time: '3 days ago',
-  },
-];
-
 export const useNotificationStore = create<NotificationsState>((set) => ({
-  notifications: seed.map((s, i) => ({ ...s, id: `n${i}`, read: false })),
+  notifications: [],
+
+  setNotifications: (notifications) => set({ notifications }),
 
   addNotification: (n) =>
     set((state) => ({

@@ -394,7 +394,7 @@ export function PharmacyInventoryPage() {
           {formStep === 1 && (
             <>
               <Input label="Drug Name" value={form.drugName} onChange={(e) => setForm({ ...form, drugName: e.target.value })} required icon={Package} />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Select label="Form" options={FORM_OPTIONS.slice(1)} value={form.form} onChange={(e) => setForm({ ...form, form: e.target.value })} />
                 <Input label="Strength" value={form.strength} onChange={(e) => setForm({ ...form, strength: e.target.value })} placeholder="e.g. 500mg" />
               </div>
@@ -415,11 +415,11 @@ export function PharmacyInventoryPage() {
 
           {formStep === 2 && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input label="Batch Number" value={form.batchNumber} onChange={(e) => setForm({ ...form, batchNumber: e.target.value })} />
                 <Input label="Expiry Date" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} required />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Input label="Quantity" type="number" value={String(form.quantityOnHand)} onChange={(e) => setForm({ ...form, quantityOnHand: parseInt(e.target.value) || 0 })} />
                 <Input label="Reorder Threshold" type="number" value={String(form.reorderThreshold)} onChange={(e) => setForm({ ...form, reorderThreshold: parseInt(e.target.value) || 0 })} />
                 <Input label="Unit Cost ($)" type="number" step="0.01" value={String(form.unitCost)} onChange={(e) => setForm({ ...form, unitCost: parseFloat(e.target.value) || 0 })} />

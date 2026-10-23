@@ -30,6 +30,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { client, getErrorMessage } from '../../services/client';
+import { toast } from '../../store/toastStore';
 import { pageWindow } from '../../components/ui/Pagination';
 import { StepIndicator } from '../../components/ui/StepIndicator';
 import {
@@ -155,7 +156,6 @@ export function FacilityRegistryPage() {
   const [detailFacility, setDetailFacility] = useState<Facility | null>(null);
   const [formData, setFormData] = useState<FacilityFormData>(INITIAL_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [credentials, setCredentials] = useState<FacilityOnboardingResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Facility | null>(null);
@@ -255,10 +255,7 @@ export function FacilityRegistryPage() {
       if (!editingFacility && res.data?.data?.temporaryPassword) {
         setCredentials(res.data.data as FacilityOnboardingResult);
       } else {
-        setFeedback({
-          type: 'success',
-          message: editingFacility ? 'Facility updated' : 'Facility registered',
-        });
+        toast.success(editingFacility ? 'Facility updated.' : 'Facility registered.', 'Facility');
       }
       setShowFormModal(false);
       setEditingFacility(null);
@@ -266,10 +263,9 @@ export function FacilityRegistryPage() {
       setFormStep(1);
       queryClient.invalidateQueries({ queryKey: ['facilities'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setTimeout(() => setFeedback(null), 4000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -279,12 +275,11 @@ export function FacilityRegistryPage() {
     mutationFn: ({ id, action }: { id: string; action: 'activate' | 'deactivate' }) =>
       client.patch(`/facilities/${id}/${action}`),
     onSuccess: () => {
-      setFeedback({ type: 'success', message: 'Facility status updated' });
+      toast.success('Facility status updated.');
       queryClient.invalidateQueries({ queryKey: ['facilities'] });
-      setTimeout(() => setFeedback(null), 4000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -292,14 +287,13 @@ export function FacilityRegistryPage() {
     mutationFn: ({ id, status }: { id: string; status: SubscriptionStatus }) =>
       client.patch(`/facilities/${id}/subscription`, { subscriptionStatus: status }),
     onSuccess: () => {
-      setFeedback({ type: 'success', message: 'Subscription updated' });
+      toast.success('Subscription updated.');
       setShowSubscriptionModal(false);
       setSubscriptionTarget(null);
       queryClient.invalidateQueries({ queryKey: ['facilities'] });
-      setTimeout(() => setFeedback(null), 4000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -307,17 +301,16 @@ export function FacilityRegistryPage() {
     mutationFn: (id: string) => client.delete(`/facilities/${id}`),
     onSuccess: (res) => {
       const suspendedStaff = res.data?.data?.suspendedStaff ?? 0;
-      setFeedback({
-        type: 'success',
-        message: `Hospital deleted${suspendedStaff ? ` — ${suspendedStaff} staff account(s) suspended` : ''}. Records are retained.`,
-      });
+      toast.success(
+        `Hospital deleted${suspendedStaff ? ` — ${suspendedStaff} staff account(s) suspended` : ''}. Records are retained.`,
+        'Hospital deleted',
+      );
       setConfirmDelete(null);
       queryClient.invalidateQueries({ queryKey: ['facilities'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setTimeout(() => setFeedback(null), 6000);
     },
     onError: (err) => {
-      setFeedback({ type: 'error', message: getErrorMessage(err) });
+      toast.error(getErrorMessage(err));
     },
   });
 
@@ -496,27 +489,6 @@ export function FacilityRegistryPage() {
           Register Hospital
         </Button>
       </div>
-
-      {/* Feedback */}
-      {feedback && (
-        <div
-          className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
-            feedback.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700'
-          }`}
-        >
-          {feedback.type === 'success' ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertCircle className="h-4 w-4 shrink-0" />
-          )}
-          {feedback.message}
-          <button onClick={() => setFeedback(null)} className="ml-auto">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* Summary Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -966,7 +938,7 @@ export function FacilityRegistryPage() {
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-slate-100 pt-4">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
               <Button onClick={() => setCredentials(null)}>Done</Button>
             </div>
           </div>
@@ -1054,7 +1026,7 @@ export function FacilityRegistryPage() {
                 are retained, and the hospital can be restored afterwards.
               </p>
             </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
               <Button variant="outline" onClick={() => setConfirmDelete(null)}>
                 {t('common.cancel')}
               </Button>
@@ -1369,7 +1341,7 @@ export function FacilityRegistryPage() {
               <p className="mt-1 text-sm text-slate-900">{detailFacility.address ?? '—'}</p>
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 [&>*]:w-full sm:[&>*]:w-auto">
               <Button
                 variant="outline"
                 onClick={() => {

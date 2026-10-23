@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
+import { useToastStore } from '../../store/toastStore';
 import { requestOtp } from '../../services/auth';
 import { getErrorMessage } from '../../services/client';
 import { Input } from '../ui/Input';
@@ -25,38 +26,44 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const { push: pushToast } = useToastStore();
+
+  const showError = (msg: string) => {
+    pushToast('error', msg);
+  };
+  const showInfo = (msg: string) => {
+    pushToast('info', msg);
+  };
 
   const from = (location.state as { from?: string })?.from ?? '/dashboard';
   const redirectToDashboard = () => navigate(from, { replace: true });
 
   const handleEmailLogin = async (e: FormEvent) => {
-    e.preventDefault(); setError(''); setLoading(true);
+    e.preventDefault(); setLoading(true);
     try { await login(email, password); redirectToDashboard(); }
-    catch (err) { setError(getErrorMessage(err)); setLoading(false); }
+    catch (err) { const msg = getErrorMessage(err); showError(msg); setLoading(false); }
   };
 
   const handleNationalIdLogin = async (e: FormEvent) => {
-    e.preventDefault(); setError(''); setLoading(true);
+    e.preventDefault(); setLoading(true);
     try { await loginWithNationalId(nationalId, password); redirectToDashboard(); }
-    catch (err) { setError(getErrorMessage(err)); setLoading(false); }
+    catch (err) { const msg = getErrorMessage(err); showError(msg); setLoading(false); }
   };
 
   const handleSendOtp = async () => {
-    setError(''); setInfo('');
     try {
-      const res = await requestOtp(email); setOtpSent(true);
-      if (res.otp && import.meta.env.DEV) setInfo(`Dev OTP: ${res.otp}`);
-      else setInfo(res.message ?? t('auth.sendOtp'));
-    } catch (err) { setError(getErrorMessage(err)); }
+      const res = await requestOtp(email);
+      setOtpSent(true);
+      if (res.otp && import.meta.env.DEV) showInfo(`Dev OTP: ${res.otp}`);
+      else showInfo(res.message ?? t('auth.sendOtp'));
+    } catch (err) { showError(getErrorMessage(err)); }
   };
 
   const handleOtpVerify = async (e: FormEvent) => {
-    e.preventDefault(); setError(''); setLoading(true);
+    e.preventDefault(); setLoading(true);
     try { await verifyOtpLogin(email, otp); redirectToDashboard(); }
-    catch (err) { setError(getErrorMessage(err)); setLoading(false); }
+    catch (err) { const msg = getErrorMessage(err); showError(msg); setLoading(false); }
   };
 
   const tabs: { id: Mode; label: string }[] = [
@@ -93,7 +100,7 @@ export function LoginForm() {
               key={tab.id}
               type="button"
               aria-pressed={selected}
-              onClick={() => { setMode(tab.id); setError(''); setInfo(''); }}
+              onClick={() => { setMode(tab.id); }}
               className={`rounded-xl px-2 py-2 text-sm font-bold leading-tight transition-all duration-200 ${
                 selected
                   ? 'bg-white text-primary-800 shadow-md ring-1 ring-slate-300 dark:bg-slate-700 dark:text-white dark:ring-slate-600'
@@ -187,20 +194,6 @@ export function LoginForm() {
             </>
           )}
         </form>
-      )}
-
-      {error && (
-        <p
-          className="mt-4 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
-      {info && (
-        <p className="mt-4 rounded-xl border-2 border-primary-200 bg-primary-50 p-3 text-sm font-bold text-primary-900 dark:border-primary-800 dark:bg-primary-950 dark:text-primary-100">
-          {info}
-        </p>
       )}
 
       <p className="mt-4 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">

@@ -58,16 +58,19 @@ export default {
         page: '#f8fafc',
       },
       fontSize: {
-        'xs': ['0.875rem', { lineHeight: '1.5' }],
-        'sm': ['1rem', { lineHeight: '1.6' }],
-        'base': ['1.125rem', { lineHeight: '1.7' }],
-        'lg': ['1.25rem', { lineHeight: '1.7' }],
-        'xl': ['1.375rem', { lineHeight: '1.6' }],
-        '2xl': ['1.625rem', { lineHeight: '1.5' }],
-        '3xl': ['2rem', { lineHeight: '1.4' }],
-        '4xl': ['2.375rem', { lineHeight: '1.3' }],
-        '5xl': ['3.125rem', { lineHeight: '1.2' }],
-        '6xl': ['3.875rem', { lineHeight: '1.1' }],
+        // The scale is deliberately a notch tighter than Tailwind's default: the app renders a
+        // lot of dense tables and side-by-side form fields, and at the stock sizes a 375px
+        // viewport could not fit a single row of them.
+        'xs': ['0.75rem', { lineHeight: '1.45' }],
+        'sm': ['0.8125rem', { lineHeight: '1.5' }],
+        'base': ['0.9375rem', { lineHeight: '1.55' }],
+        'lg': ['1.0625rem', { lineHeight: '1.5' }],
+        'xl': ['1.1875rem', { lineHeight: '1.45' }],
+        '2xl': ['1.4375rem', { lineHeight: '1.4' }],
+        '3xl': ['1.8125rem', { lineHeight: '1.3' }],
+        '4xl': ['2.25rem', { lineHeight: '1.25' }],
+        '5xl': ['2.875rem', { lineHeight: '1.15' }],
+        '6xl': ['3.5rem', { lineHeight: '1.05' }],
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', '"Nunito Sans"', 'system-ui', 'sans-serif'],
@@ -92,6 +95,9 @@ export default {
         'page-in': 'pageIn 0.35s ease-out both',
         float: 'float 6s ease-in-out infinite',
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'slide-in-right': 'slideInRight 0.22s ease-out',
+        'slide-out-right': 'slideOutRight 0.18s ease-in',
+        'modal-in': 'modalIn 0.2s ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -109,6 +115,18 @@ export default {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-20px)' },
+        },
+        slideInRight: {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        slideOutRight: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        modalIn: {
+          '0%': { opacity: '0', transform: 'translateY(12px) scale(0.98)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
       },
     },

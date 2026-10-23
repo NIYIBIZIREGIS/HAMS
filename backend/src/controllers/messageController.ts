@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { Types, type PipelineStage } from 'mongoose';
 import { AuthRequest } from '../middleware/auth';
-import { Message, Patient, User } from '../models';
+import { Message, Patient, User, Doctor, Notification } from '../models';
 import { success, paginate } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 import { assertPatientReachable } from '../services/patientAccess';
@@ -226,6 +226,20 @@ export async function createMessage(req: AuthRequest, res: Response) {
   message.threadId = message._id;
   await message.save();
 
+  try {
+    await Notification.create({
+      patientId: patient._id,
+      facilityId,
+      recipientType: 'patient',
+      type: 'message',
+      title: 'New message',
+      body: `You have a new message: ${body.subject}`,
+      link: '/messages',
+    });
+  } catch (err) {
+    console.error('[notification] message notify failed:', err instanceof Error ? err.message : err);
+  }
+
   success(res, 201, message);
 }
 
@@ -274,6 +288,35 @@ export async function replyToThread(req: AuthRequest, res: Response) {
     // The recipient has not seen it yet; the author obviously has.
     isRead: false,
   });
+
+  try {
+    if (isPatient) {
+      const doctors = await Doctor.find({ facilityId: root.facilityId }).select('_id');
+      for (const d of doctors) {
+        await Notification.create({
+          doctorId: d._id,
+          facilityId: root.facilityId,
+          recipientType: 'doctor',
+          type: 'message',
+          title: 'New message from patient',
+          body: `You have a new message in a thread.`,
+          link: '/messages',
+        });
+      }
+    } else {
+      await Notification.create({
+        patientId: root.patientId,
+        facilityId: root.facilityId,
+        recipientType: 'patient',
+        type: 'message',
+        title: 'New message',
+        body: `You have a new message from staff.`,
+        link: '/messages',
+      });
+    }
+  } catch (err) {
+    console.error('[notification] reply notify failed:', err instanceof Error ? err.message : err);
+  }
 
   success(res, 201, reply);
 }

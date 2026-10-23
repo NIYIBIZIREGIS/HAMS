@@ -15,6 +15,7 @@ import {
   ROLE_FACILITY_ADMIN,
   ROLE_PATIENT,
   ROLE_RECEPTIONIST,
+  ROLE_SUPER_ADMIN,
 } from '../utils/tenancy';
 
 export async function listPatients(req: AuthRequest, res: Response) {
@@ -171,7 +172,7 @@ export async function updatePatient(req: AuthRequest, res: Response) {
 }
 
 export async function deletePatient(req: AuthRequest, res: Response) {
-  if (!hasRole(req.user, ROLE_FACILITY_ADMIN, ROLE_RECEPTIONIST)) {
+  if (!hasRole(req.user, ROLE_FACILITY_ADMIN, ROLE_RECEPTIONIST, ROLE_SUPER_ADMIN)) {
     throw forbidden('Forbidden');
   }
 

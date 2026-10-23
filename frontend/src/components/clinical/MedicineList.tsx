@@ -49,8 +49,8 @@ export function MedicineList({ medicines, onChange, readOnly = false }: Props) {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 sm:col-span-1">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-1">
               <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`med-name-${i}`}>
                 {t('consultation.medicineName')} <span className="text-red-500">*</span>
               </label>
@@ -58,7 +58,7 @@ export function MedicineList({ medicines, onChange, readOnly = false }: Props) {
                 id={`med-name-${i}`}
                 type="text"
                 readOnly={readOnly}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[1rem] focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 sm:text-sm"
                 value={med.name}
                 onChange={(e) => update(i, 'name', e.target.value)}
                 placeholder="e.g. Amoxicillin"
@@ -72,7 +72,7 @@ export function MedicineList({ medicines, onChange, readOnly = false }: Props) {
                 id={`med-dosage-${i}`}
                 type="text"
                 readOnly={readOnly}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[1rem] focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 sm:text-sm"
                 value={med.dosage}
                 onChange={(e) => update(i, 'dosage', e.target.value)}
                 placeholder="500mg"
@@ -86,7 +86,7 @@ export function MedicineList({ medicines, onChange, readOnly = false }: Props) {
                 id={`med-freq-${i}`}
                 type="text"
                 readOnly={readOnly}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[1rem] focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 sm:text-sm"
                 value={med.frequency}
                 onChange={(e) => update(i, 'frequency', e.target.value)}
                 placeholder="Twice daily"
@@ -103,7 +103,7 @@ export function MedicineList({ medicines, onChange, readOnly = false }: Props) {
                   min={1}
                   max={365}
                   readOnly={readOnly}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[1rem] focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 sm:text-sm"
                   value={med.durationDays}
                   onChange={(e) => update(i, 'durationDays', parseInt(e.target.value, 10) || 1)}
                 />
@@ -118,7 +118,7 @@ export function MedicineList({ medicines, onChange, readOnly = false }: Props) {
                 id={`med-instr-${i}`}
                 type="text"
                 readOnly={readOnly}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[1rem] focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 sm:text-sm"
                 value={med.instructions ?? ''}
                 onChange={(e) => update(i, 'instructions', e.target.value)}
                 placeholder="e.g. Take with food"

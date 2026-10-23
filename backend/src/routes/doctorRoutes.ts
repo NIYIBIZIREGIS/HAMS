@@ -26,6 +26,7 @@ router.get(
   asyncHandler(doctorController.listDoctors)
 );
 
+router.get('/mine', authenticate, requireRole('doctor'), asyncHandler(doctorController.getMyDoctor));
 router.get('/:id/availability', authenticate, validateObjectId('id'), validate(availabilityQuery, 'query'), asyncHandler(doctorController.getDoctorAvailability));
 router.get('/:id/schedule', authenticate, validateObjectId('id'), asyncHandler(doctorController.getDoctorSchedule));
 router.get('/:id', authenticate, validateObjectId('id'), asyncHandler(doctorController.getDoctor));
