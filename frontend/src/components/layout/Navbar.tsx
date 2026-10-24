@@ -14,7 +14,7 @@ const mobileLinkClass =
 export function Navbar() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
-  const { requestLogout, logoutDialog } = useLogoutConfirmation();
+  const { requestLogout, dialog: logoutDialog } = useLogoutConfirmation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = () => {

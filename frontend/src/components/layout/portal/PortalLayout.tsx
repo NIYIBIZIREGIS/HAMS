@@ -2,15 +2,39 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { PortalSidebar } from './PortalSidebar';
 import { PortalHeader } from './PortalHeader';
+import { useAuthStore } from '../../../store/authStore';
+import { useNotificationStore } from '../../../store/notificationStore';
 
 export function PortalLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const userId = useAuthStore((state) => state.user?.id);
+  const loadNotifications = useNotificationStore((state) => state.loadNotifications);
+  const clearNotifications = useNotificationStore((state) => state.clear);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void loadNotifications();
+
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void loadNotifications();
+    };
+    const interval = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [userId, loadNotifications, location.pathname]);
+
+  useEffect(() => {
+    if (!userId) clearNotifications();
+  }, [userId, clearNotifications]);
 
   return (
     <div className="min-h-screen bg-surface dark:bg-slate-950">

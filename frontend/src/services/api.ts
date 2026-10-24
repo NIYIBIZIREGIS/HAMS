@@ -986,6 +986,7 @@ export type NotificationType =
   | 'lab_result'
   | 'prescription'
   | 'billing'
+  | 'message'
   | 'general';
 
 export interface Notification {

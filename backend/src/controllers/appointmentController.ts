@@ -1,7 +1,6 @@
 import { Response } from 'express';
-import { Types } from 'mongoose';
 import { AuthRequest } from '../middleware/auth';
-import { Appointment, Doctor, Patient, APPOINTMENT_STATUSES, type AppointmentStatus, Notification, User } from '../models';
+import { Appointment, Doctor, Patient, APPOINTMENT_STATUSES, type AppointmentStatus, Notification } from '../models';
 import { success, paginate } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 import { bookAppointment, assertValidTransition, nextQueueNumber } from '../services/bookingService';
