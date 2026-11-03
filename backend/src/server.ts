@@ -2,6 +2,7 @@ import { app } from './app';
 import { connectDB } from './config/db';
 import { config } from './config/env';
 import { seedIfNeeded } from './seed';
+import { startAppointmentReminderScheduler } from './services/appointmentReminderService';
 
 async function start() {
   await connectDB();
@@ -12,6 +13,7 @@ async function start() {
     console.log(`HAS backend running on http://localhost:${config.port}`);
     console.log(`Swagger docs: http://localhost:${config.port}/api-docs`);
   });
+  startAppointmentReminderScheduler();
 }
 
 start().catch((err) => {

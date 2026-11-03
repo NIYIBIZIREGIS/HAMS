@@ -117,11 +117,21 @@ export interface Appointment {
   appointmentDate: string;
   timeSlot: string;
   reason?: string;
+  meetingLink?: string | null;
   visitType: string;
   status: string;
   queueNumber?: number;
   checkInTime?: string;
   completedAt?: string;
+  cancellationReason?: string;
+  declineReason?: string;
+  proposedDate?: string;
+  proposedTimeSlot?: string;
+  proposedNote?: string;
+  proposedBy?: string;
+  proposedAt?: string;
+  decidedBy?: string;
+  decidedAt?: string;
 }
 
 export async function listFacilities(): Promise<Facility[]> {
@@ -387,6 +397,59 @@ export async function listAppointmentsPage(
   return fetchPage<Appointment>('/appointments', params);
 }
 
+export async function getAppointment(id: string): Promise<Appointment> {
+  const res = await client.get(`/appointments/${id}`);
+  return res.data.data as Appointment;
+}
+
+export async function acceptAppointment(id: string): Promise<Appointment> {
+  const res = await client.patch(`/appointments/${id}/accept`);
+  return res.data.data as Appointment;
+}
+
+export async function declineAppointment(id: string, reason: string): Promise<Appointment> {
+  const res = await client.patch(`/appointments/${id}/decline`, { reason });
+  return res.data.data as Appointment;
+}
+
+export async function proposeReschedule(
+  id: string,
+  payload: { appointmentDate: string; timeSlot: string; note?: string },
+): Promise<Appointment> {
+  const res = await client.patch(`/appointments/${id}/propose`, payload);
+  return res.data.data as Appointment;
+}
+
+export async function respondToRescheduleProposal(
+  id: string,
+  decision: 'accept' | 'reject',
+  reason?: string,
+): Promise<Appointment> {
+  const res = await client.patch(`/appointments/${id}/proposal/${decision}`, { reason });
+  return res.data.data as Appointment;
+}
+
+export async function rescheduleAppointment(
+  id: string,
+  payload: { appointmentDate: string; timeSlot: string; reason?: string },
+): Promise<Appointment> {
+  const res = await client.patch(`/appointments/${id}/reschedule`, payload);
+  return res.data.data as Appointment;
+}
+
+export interface DoctorPatientSummary {
+  patient: Patient;
+  medicalHistory: MedicalRecord[];
+  previousVisits: Appointment[];
+  labResults: LaboratoryTest[];
+  documents: PatientDocument[];
+}
+
+export async function getAppointmentPatientSummary(id: string): Promise<DoctorPatientSummary> {
+  const res = await client.get(`/appointments/${id}/patient-summary`);
+  return res.data.data as DoctorPatientSummary;
+}
+
 export async function listPrescriptionsPage(
   params?: Record<string, unknown>,
 ): Promise<Page<Prescription>> {
@@ -442,9 +505,54 @@ export async function updateAppointmentStatus(id: string, status: string, cancel
   return res.data.data as Appointment;
 }
 
+export async function updateAppointmentMeetingLink(id: string, meetingLink: string | null) {
+  const res = await client.patch(`/appointments/${id}/meeting-link`, { meetingLink });
+  return res.data.data as Appointment;
+}
+
 export async function cancelAppointment(id: string, cancellationReason?: string) {
   const res = await client.delete(`/appointments/${id}`, { data: { cancellationReason } });
   return res.data.data as Appointment;
+}
+
+export async function startConsultation(id: string) {
+  const res = await client.patch(`/appointments/${id}/start`);
+  return res.data.data as Appointment;
+}
+
+export async function completeConsultation(id: string) {
+  const res = await client.patch(`/appointments/${id}/complete`);
+  return res.data.data as Appointment;
+}
+
+export async function markNoShow(id: string) {
+  const res = await client.patch(`/appointments/${id}/no-show`);
+  return res.data.data as Appointment;
+}
+
+export async function bookFollowUp(
+  id: string,
+  payload: { appointmentDate: string; timeSlot: string; note?: string; autoConfirm: boolean },
+) {
+  const res = await client.post(`/appointments/${id}/follow-up`, payload);
+  return res.data.data as Appointment;
+}
+
+export async function referPatient(
+  id: string,
+  payload: {
+    targetDoctorId: string;
+    note: string;
+    appointmentDate?: string;
+    timeSlot?: string;
+  },
+) {
+  const res = await client.post(`/appointments/${id}/refer`, payload);
+  return res.data.data as {
+    note: string;
+    targetDoctorId: string;
+    appointment: Appointment | null;
+  };
 }
 
 // ── Phase 2: Clinical ────────────────────────────────────────────────────────
@@ -465,6 +573,7 @@ export interface MedicalRecord {
   appointmentId: string | { _id: string; appointmentDate: string; timeSlot: string; visitType: string; status: string };
   facilityId: string;
   vitals?: Vitals;
+  chiefComplaint?: string;
   symptoms: string[];
   diagnosis: string;
   treatment?: string;
@@ -484,6 +593,7 @@ export interface PrescriptionMedicine {
 export interface Prescription {
   _id: string;
   medicalRecordId: string;
+  appointmentId?: string | null;
   patientId: string | { _id: string; patientNumber: string; userId?: { fullName: string } };
   doctorId: string | { _id: string; userId?: { fullName: string } };
   facilityId: string | { _id: string; name: string };
@@ -513,6 +623,7 @@ export interface LaboratoryTest {
 export async function createMedicalRecord(payload: {
   appointmentId: string;
   vitals?: Vitals;
+  chiefComplaint?: string;
   symptoms?: string[];
   diagnosis: string;
   treatment?: string;
@@ -993,6 +1104,7 @@ export interface Notification {
   _id: string;
   facilityId: string;
   patientId: string;
+  appointmentId?: string;
   type: NotificationType;
   title: string;
   body: string;

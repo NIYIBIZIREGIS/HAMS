@@ -358,6 +358,24 @@ export const appointmentUpdateSchema = z.object({
   visitType: z.enum(['new', 'follow-up', 'referral']).optional(),
 });
 
+const meetingLinkValue = z
+  .string()
+  .trim()
+  .max(2048, 'Meeting link is too long')
+  .refine((value) => {
+    if (value === '') return true;
+    try {
+      const url = new URL(value);
+      return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname);
+    } catch {
+      return false;
+    }
+  }, 'Meeting link must be a valid http(s) URL');
+
+export const appointmentMeetingLinkSchema = z.object({
+  meetingLink: z.union([meetingLinkValue, z.null()]),
+});
+
 export const appointmentStatusSchema = z.object({
   status: z.enum([
     'Pending',
@@ -367,10 +385,52 @@ export const appointmentStatusSchema = z.object({
     'Completed',
     'Cancelled',
     'Missed',
+    'Declined',
     'Rejected',
+    'Reschedule Proposed',
   ]),
   cancellationReason: z.string().max(300).optional(),
 });
+
+export const appointmentDeclineSchema = z.object({
+  reason: z.string().trim().min(3, 'A decline reason is required').max(300),
+});
+
+export const appointmentProposalSchema = z.object({
+  appointmentDate: z.string().datetime({ offset: true }),
+  timeSlot: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid time (HH:mm)'),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const appointmentRescheduleSchema = z.object({
+  appointmentDate: z.string().datetime({ offset: true }),
+  timeSlot: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid time (HH:mm)'),
+  reason: z.string().trim().max(500).optional(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const appointmentProposalResponseSchema = z.object({
+  reason: z.string().trim().max(300).optional(),
+});
+
+export const appointmentFollowUpSchema = z.object({
+  appointmentDate: z.string().datetime({ offset: true }),
+  timeSlot: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid time (HH:mm)'),
+  note: z.string().trim().max(500).optional(),
+  autoConfirm: z.boolean().default(true),
+});
+
+export const appointmentReferralSchema = z
+  .object({
+    targetDoctorId: objectId,
+    note: z.string().trim().min(3, 'A referral note is required').max(1000),
+    appointmentDate: z.string().datetime({ offset: true }).optional(),
+    timeSlot: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid time (HH:mm)').optional(),
+  })
+  .refine((value) => Boolean(value.appointmentDate) === Boolean(value.timeSlot), {
+    message: 'Both appointmentDate and timeSlot are required to book a referral appointment',
+    path: ['timeSlot'],
+  });
 
 export const availabilityQuery = z.object({
   date: z.string().date().or(z.string().datetime({ offset: true })),
@@ -389,10 +449,14 @@ export const paginationQuery = z.object({
   doctorId: objectId.optional(),
   departmentId: objectId.optional(),
   patientId: objectId.optional(),
+  appointmentId: objectId.optional(),
+  /** Doctor appointment table ordering; defaults to newest-first for existing views. */
+  sort: z.enum(['asc', 'desc']).optional(),
   region: z.string().optional(),
   district: z.string().optional(),
   isActive: z.string().optional(),
-  search: z.string().optional(),
+  /** Free-text filter (patient name on appointment lists). */
+  search: z.string().trim().max(100).optional(),
   category: z.string().optional(),
   role: z.string().optional(),
 });
@@ -411,6 +475,7 @@ export const vitalsSchema = z.object({
 export const medicalRecordSchema = z.object({
   appointmentId: objectId,
   vitals: vitalsSchema.optional(),
+  chiefComplaint: z.string().trim().max(1000).optional(),
   symptoms: z.array(z.string().max(200)).default([]),
   diagnosis: z.string().min(2).max(1000),
   treatment: z.string().max(2000).optional(),

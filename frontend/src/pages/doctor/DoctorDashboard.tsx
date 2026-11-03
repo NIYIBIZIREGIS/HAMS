@@ -12,13 +12,31 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import api, { getErrorMessage, type Appointment } from '../../services/api';
+import {
+  getErrorMessage,
+  listAppointmentsPage,
+  type Appointment,
+} from '../../services/api';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { MetricCard } from '../../components/ui/MetricCard';
 import { Button } from '../../components/ui/Button';
 import { PageSpinner } from '../../components/ui/Spinner';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function isoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+function startOfWeek(date: Date): Date {
+  const start = new Date(date);
+  const day = start.getDay();
+  start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
 
 const STATUS_STYLES: Record<string, string> = {
   Confirmed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -49,25 +67,38 @@ export function DoctorDashboard() {
   const user = useAuthStore((s) => s.user);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [completedThisWeek, setCompletedThisWeek] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const todayStr = isoDate(today);
+  const weekStartStr = isoDate(startOfWeek(today));
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<{ data?: Appointment[] } | Appointment[]>('/appointments', {
-        params: { date: new Date().toISOString().split('T')[0] },
-      });
-      setAppointments(Array.isArray(res.data) ? res.data : (res.data.data ?? []));
+      const [todayPage, pendingPage, completedPage] = await Promise.all([
+        listAppointmentsPage({ date: todayStr, limit: 100 }),
+        listAppointmentsPage({ status: 'Pending', limit: 1 }),
+        listAppointmentsPage({
+          status: 'Completed',
+          dateFrom: weekStartStr,
+          dateTo: todayStr,
+          limit: 100,
+        }),
+      ]);
+      setAppointments(todayPage.items);
+      setPendingRequests(pendingPage.total);
+      setCompletedThisWeek(completedPage.total);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [todayStr, weekStartStr]);
 
   useEffect(() => {
     void fetchData();
@@ -75,13 +106,11 @@ export function DoctorDashboard() {
 
   const todayAppts = [...appointments].sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
 
-  const pendingCount = todayAppts.filter((a) =>
-    ['Pending', 'Confirmed', 'Checked In'].includes(a.status),
-  ).length;
-  const completedCount = todayAppts.filter((a) => a.status === 'Completed').length;
-
-  const patientsThisWeek = new Set(
-    todayAppts.map((a) => (typeof a.patientId === 'string' ? a.patientId : a.patientId._id)),
+  const pendingCount = pendingRequests;
+  const patientsToday = new Set(
+    todayAppts
+      .filter((a) => !['Cancelled', 'Declined', 'Rejected', 'Missed'].includes(a.status))
+      .map((a) => (typeof a.patientId === 'string' ? a.patientId : a.patientId._id)),
   ).size;
 
   const specialty =
@@ -159,22 +188,22 @@ export function DoctorDashboard() {
           />
           <MetricCard
             icon={Clock}
-            label={t('doctor.pendingConsultations', 'Pending Consultations')}
+            label={t('doctor.pendingRequests', 'Pending Requests')}
             value={pendingCount}
             iconBg="bg-amber-50"
             iconColor="text-amber-600"
           />
           <MetricCard
             icon={CheckCircle}
-            label={t('doctor.completedToday', 'Completed Today')}
-            value={completedCount}
+            label={t('doctor.completedThisWeek', 'Completed This Week')}
+            value={completedThisWeek}
             iconBg="bg-emerald-50"
             iconColor="text-emerald-600"
           />
           <MetricCard
             icon={Users}
-            label={t('doctor.patientsThisWeek', 'Patients This Week')}
-            value={patientsThisWeek}
+            label={t('doctor.todayPatients', "Today's Patients")}
+            value={patientsToday}
             iconBg="bg-purple-50"
             iconColor="text-purple-600"
           />
@@ -216,27 +245,32 @@ export function DoctorDashboard() {
                       key={appt._id}
                       className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-3.5 transition-colors hover:bg-slate-50/50 sm:flex-nowrap"
                     >
-                      {/* Time */}
-                      <div className="flex w-16 shrink-0 flex-col items-start">
-                        <span
-                          className={`text-sm font-semibold ${
-                            isInProgress ? 'text-primary-600' : 'text-slate-900'
-                          }`}
-                        >
-                          {appt.timeSlot}
-                        </span>
-                        {appt.queueNumber != null && (
-                          <span className="text-xs text-slate-400">#{appt.queueNumber}</span>
-                        )}
-                      </div>
+                      <Link
+                        to={`/doctor/appointments/${appt._id}`}
+                        className="flex min-w-0 flex-1 items-center gap-x-4 gap-y-2 rounded-lg -mx-1 px-1 py-1 transition-colors hover:bg-slate-50"
+                      >
+                        {/* Time */}
+                        <div className="flex w-16 shrink-0 flex-col items-start">
+                          <span
+                            className={`text-sm font-semibold ${
+                              isInProgress ? 'text-primary-600' : 'text-slate-900'
+                            }`}
+                          >
+                            {appt.timeSlot}
+                          </span>
+                          {appt.queueNumber != null && (
+                            <span className="text-xs text-slate-400">#{appt.queueNumber}</span>
+                          )}
+                        </div>
 
-                      {/* Patient + type */}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900">
-                          {patientName(appt)}
-                        </p>
-                        <p className="truncate text-xs text-slate-500">{appt.visitType}</p>
-                      </div>
+                        {/* Patient + type */}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {patientName(appt)}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">{appt.visitType}</p>
+                        </div>
+                      </Link>
 
                       {/* Status */}
                       <StatusBadge status={appt.status} />
@@ -293,6 +327,23 @@ export function DoctorDashboard() {
                   <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
                 </button>
               )}
+
+              <Link to="/doctor/calendar" className="block">
+                <button className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-primary-200 hover:bg-primary-50">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                    <Calendar className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {t('doctor.openCalendar', 'Open calendar')}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {t('doctor.openCalendarHint', 'See your availability and appointments')}
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
+                </button>
+              </Link>
 
               <Link to="/availability" className="block">
                 <button className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-primary-200 hover:bg-primary-50">

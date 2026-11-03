@@ -15,6 +15,7 @@ export interface IMedicalRecord extends Document {
   appointmentId: Types.ObjectId;
   facilityId: Types.ObjectId;
   vitals?: IVitals;
+  chiefComplaint?: string;
   symptoms: string[];
   diagnosis: string;
   treatment?: string;
@@ -43,6 +44,7 @@ const medicalRecordSchema = new Schema<IMedicalRecord>(
     appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointments', required: true },
     facilityId: { type: Schema.Types.ObjectId, ref: 'Facilities', required: true },
     vitals: { type: vitalsSchema, default: {} },
+    chiefComplaint: { type: String, trim: true, maxlength: 1000 },
     symptoms: { type: [String], default: [] },
     diagnosis: { type: String, required: true, trim: true },
     treatment: { type: String, trim: true },

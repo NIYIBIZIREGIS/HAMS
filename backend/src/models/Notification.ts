@@ -13,6 +13,7 @@ export interface INotification extends Document {
   patientId?: Types.ObjectId;
   userId?: Types.ObjectId;
   doctorId?: Types.ObjectId;
+  appointmentId?: Types.ObjectId;
   recipientType?: 'patient' | 'doctor' | 'user' | 'staff';
   type: NotificationType;
   title: string;
@@ -30,6 +31,7 @@ const notificationSchema = new Schema<INotification>(
     patientId: { type: Schema.Types.ObjectId, ref: 'Patients' },
     userId: { type: Schema.Types.ObjectId, ref: 'Users' },
     doctorId: { type: Schema.Types.ObjectId, ref: 'Doctors' },
+    appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointments' },
     recipientType: { type: String, enum: ['patient', 'doctor', 'user', 'staff'] },
     type: {
       type: String,
@@ -50,5 +52,6 @@ notificationSchema.index({ facilityId: 1, createdAt: -1 });
 notificationSchema.index({ patientId: 1, isRead: 1 });
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ doctorId: 1, createdAt: -1 });
+notificationSchema.index({ appointmentId: 1 });
 
 export const Notification = model<INotification>('Notifications', notificationSchema);

@@ -2,13 +2,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Calendar, Clock, MapPin, Stethoscope, XCircle, ArrowLeft, AlertCircle, User,
+  Calendar, CalendarClock, CheckCircle2, Clock, MapPin, Stethoscope, Video, XCircle, ArrowLeft, AlertCircle, User,
 } from 'lucide-react';
-import api, { cancelAppointment, type Appointment } from '../../services/api';
+import {
+  cancelAppointment,
+  getAppointment,
+  respondToRescheduleProposal,
+  type Appointment,
+} from '../../services/api';
 import { StatusBadge } from '../../components/appointments/StatusBadge';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { Modal } from '../../components/ui/Modal';
+import { toast } from '../../store/toastStore';
 
 export function AppointmentDetailPage() {
   const { t } = useTranslation();
@@ -20,16 +27,20 @@ export function AppointmentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [proposalAction, setProposalAction] = useState<'accept' | 'reject' | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
+    if (!id) {
+      setError(t('appointments.noAppointments'));
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<{ data?: Appointment[] } | Appointment[]>('/appointments');
-      const list = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
-      const found = list.find((a) => a._id === id) ?? null;
-      if (!found) setError(t('appointments.noAppointments'));
-      setAppointment(found);
+      setAppointment(await getAppointment(id));
     } catch {
       setError(t('common.error'));
     } finally {
@@ -54,6 +65,12 @@ export function AppointmentDetailPage() {
     : '—';
 
   const canCancel = appointment ? ['Pending', 'Confirmed'].includes(appointment.status) : false;
+  const meetingLink =
+    appointment &&
+    ['Confirmed', 'Checked In', 'In Progress', 'Completed'].includes(appointment.status) &&
+    /^https?:\/\//i.test(appointment.meetingLink ?? '')
+      ? appointment.meetingLink
+      : null;
 
   const handleCancel = async () => {
     if (!appointment) return;
@@ -66,6 +83,26 @@ export function AppointmentDetailPage() {
       setError(t('common.error'));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleProposal = async (decision: 'accept' | 'reject', reason?: string) => {
+    if (!appointment) return;
+    setProposalAction(decision);
+    try {
+      await respondToRescheduleProposal(appointment._id, decision, reason);
+      toast.success(
+        decision === 'accept'
+          ? t('portal.appointments.proposalAccepted')
+          : t('portal.appointments.proposalRejected')
+      );
+      setRejectOpen(false);
+      setRejectReason('');
+      await fetchData();
+    } catch {
+      setError(t('common.error'));
+    } finally {
+      setProposalAction(null);
     }
   };
 
@@ -120,6 +157,72 @@ export function AppointmentDetailPage() {
           <StatusBadge status={appointment.status} />
         </div>
 
+        {appointment.status === 'Reschedule Proposed' && appointment.proposedDate && (
+          <div className="mt-5 rounded-xl border border-status-pending-bg bg-status-pending-bg p-4">
+            <p className="flex items-center gap-2 text-sm font-bold text-status-pending-text">
+              <CalendarClock className="h-4 w-4" />
+              {t('portal.appointments.proposalTitle')}
+            </p>
+            <p className="mt-2 text-sm text-status-pending-text">
+              {t('portal.appointments.proposalMessage', {
+                date: new Date(appointment.proposedDate).toLocaleDateString(),
+                time: appointment.proposedTimeSlot,
+              })}
+            </p>
+            {appointment.proposedNote && (
+              <p className="mt-1 text-sm text-status-pending-text">{appointment.proposedNote}</p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                icon={CheckCircle2}
+                loading={proposalAction === 'accept'}
+                disabled={proposalAction !== null}
+                onClick={() => void handleProposal('accept')}
+              >
+                {t('portal.appointments.acceptProposal')}
+              </Button>
+              <Button
+                variant="danger"
+                icon={XCircle}
+                disabled={proposalAction !== null}
+                onClick={() => setRejectOpen(true)}
+              >
+                {t('portal.appointments.rejectProposal')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {meetingLink && (
+          <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <Video className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-text-main dark:text-white">
+                  {t('teleconsultation.title', 'Online consultation')}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-text-muted dark:text-slate-400">
+                  {t(
+                    'teleconsultation.patientHint',
+                    'Your doctor will meet you online. Join using the link below.'
+                  )}
+                </p>
+                <a
+                  href={meetingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                >
+                  <Video className="h-4 w-4" />
+                  {t('teleconsultation.join', 'Join video consultation')}
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-surface p-4 dark:border-slate-800 dark:bg-slate-950">
@@ -149,7 +252,57 @@ export function AppointmentDetailPage() {
             </p>
           </div>
         )}
+
+        {(appointment.declineReason || appointment.cancellationReason) && (
+          <div className="mt-6">
+            <p className="text-sm font-semibold text-text-main dark:text-white">
+              {appointment.declineReason ? t('appointments.declineReason') : t('appointments.cancellationReason')}
+            </p>
+            <p className="mt-1.5 rounded-xl border border-status-cancelled-bg bg-status-cancelled-bg p-4 text-sm leading-relaxed text-status-cancelled-text">
+              {appointment.declineReason ?? appointment.cancellationReason}
+            </p>
+          </div>
+        )}
       </Card>
+
+      <Modal
+        open={rejectOpen}
+        onClose={() => !proposalAction && setRejectOpen(false)}
+        title={t('portal.appointments.rejectProposalTitle')}
+        width="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRejectOpen(false)} disabled={proposalAction !== null}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              loading={proposalAction === 'reject'}
+              onClick={() => void handleProposal('reject', rejectReason.trim() || undefined)}
+            >
+              {t('portal.appointments.rejectProposal')}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed text-text-muted dark:text-slate-400">
+            {t('portal.appointments.rejectProposalMessage')}
+          </p>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-text-main dark:text-white">
+              {t('common.optional')}
+            </span>
+            <textarea
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              rows={3}
+              maxLength={300}
+              className="w-full resize-none rounded-xl border border-slate-200 bg-card px-3 py-2.5 text-sm text-text-main outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            />
+          </label>
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={confirmOpen}

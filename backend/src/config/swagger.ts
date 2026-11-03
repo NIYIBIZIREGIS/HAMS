@@ -85,9 +85,13 @@ const schemas: Record<string, Record<string, unknown>> = {
       appointmentDate: { type: 'string', format: 'date-time' },
       timeSlot: { type: 'string', example: '09:00' },
       visitType: { type: 'string', enum: ['new', 'follow-up', 'referral'] },
+      meetingLink: { type: 'string', format: 'uri', nullable: true },
       bookingChannel: { type: 'string', enum: ['web', 'mobile', 'sms', 'ussd', 'walk_in', 'referral'] },
-      status: { type: 'string', enum: ['Pending', 'Confirmed', 'Checked In', 'In Progress', 'Completed', 'Cancelled', 'Missed', 'Rejected'] },
+      status: { type: 'string', enum: ['Pending', 'Confirmed', 'Checked In', 'In Progress', 'Completed', 'Cancelled', 'Missed', 'Declined', 'Rejected'] },
       queueNumber: { type: 'number' },
+      declineReason: { type: 'string', nullable: true },
+      decidedBy: { type: 'string', nullable: true },
+      decidedAt: { type: 'string', format: 'date-time', nullable: true },
     },
   },
   AvailableSlot: {
@@ -396,7 +400,16 @@ const paths: Record<string, Record<string, unknown>> = {
     put: { tags: ['Appointments'], summary: 'Reschedule/update an appointment', security: [bearerAuth], parameters: idParam(), responses: json200('Updated appointment') },
     delete: { tags: ['Appointments'], summary: 'Cancel an appointment', security: [bearerAuth], parameters: idParam(), responses: json200('Appointment cancelled') },
   },
-  '/appointments/{id}/status': {
+    '/appointments/{id}/meeting-link': {
+      patch: {
+        tags: ['Appointments'],
+        summary: 'Set or clear a teleconsultation meeting link (doctor)',
+        security: [bearerAuth],
+        parameters: idParam(),
+        responses: json200('Updated appointment'),
+      },
+    },
+    '/appointments/{id}/status': {
     patch: {
       tags: ['Appointments'],
       summary: 'Transition appointment status',

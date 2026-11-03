@@ -7,10 +7,13 @@ import {
   createMedicalRecord,
   createPrescription,
   createLabTest,
-  updateAppointmentStatus,
+  bookFollowUp,
+  completeConsultation,
+  startConsultation,
   listLabTests,
   listPrescriptions,
   getPrescriptionPdfUrl,
+  referPatient,
   type PrescriptionMedicine,
   type Patient,
   type Appointment,
@@ -24,6 +27,9 @@ import { PageSpinner } from '../../components/ui/Spinner';
 import { AllergyWarningBanner } from '../../components/clinical/AllergyWarningBanner';
 import { VitalsForm, VitalsDisplay } from '../../components/clinical/VitalsForm';
 import { MedicineList } from '../../components/clinical/MedicineList';
+import { FollowUpModal, type FollowUpPayload } from '../../components/appointments/FollowUpModal';
+import { ReferralModal, type ReferralPayload } from '../../components/appointments/ReferralModal';
+import { toast } from '../../store/toastStore';
 import {
   User,
   FileText,
@@ -37,9 +43,13 @@ import {
   Plus,
   X,
   ChevronRight,
+  CalendarPlus,
+  UserPlus,
+  CalendarCheck,
+  PlayCircle,
 } from 'lucide-react';
 
-type ConsultationStep = 'vitals' | 'record' | 'prescription' | 'labs' | 'done';
+type ConsultationStep = 'vitals' | 'record' | 'prescription' | 'labs' | 'follow-up' | 'done';
 
 export function ConsultationScreen() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
@@ -61,6 +71,7 @@ export function ConsultationScreen() {
     oxygenSaturation: '',
   });
 
+  const [chiefComplaint, setChiefComplaint] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [treatment, setTreatment] = useState('');
   const [notes, setNotes] = useState('');
@@ -78,6 +89,9 @@ export function ConsultationScreen() {
   const [labTestName, setLabTestName] = useState('');
   const [labTests, setLabTests] = useState<string[]>([]);
 
+  const [followUpOpen, setFollowUpOpen] = useState(false);
+  const [referralOpen, setReferralOpen] = useState(false);
+
   const { data: appointment, isLoading: loadingAppointment } = useQuery({
     queryKey: ['appointment', appointmentId],
     queryFn: async () => {
@@ -86,6 +100,13 @@ export function ConsultationScreen() {
     },
     enabled: !!appointmentId,
   });
+
+  const appointmentDoctorId =
+    appointment && typeof appointment.doctorId === 'object'
+      ? appointment.doctorId._id
+      : typeof appointment?.doctorId === 'string'
+        ? appointment.doctorId
+        : '';
 
   const patientId =
     appointment && typeof appointment.patientId === 'object'
@@ -137,6 +158,7 @@ export function ConsultationScreen() {
             ? parseFloat(vitals.oxygenSaturation)
             : undefined,
         },
+        chiefComplaint: chiefComplaint.trim() || undefined,
         symptoms: symptoms.split(',').map((s) => s.trim()).filter(Boolean),
         diagnosis: diagnoses.filter((d) => d.trim()).join('; '),
         treatment: treatment || undefined,
@@ -186,10 +208,58 @@ export function ConsultationScreen() {
   });
 
   const completeMutation = useMutation({
-    mutationFn: () => updateAppointmentStatus(appointmentId!, 'Completed'),
+    mutationFn: () => completeConsultation(appointmentId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointment', appointmentId] });
       navigate('/dashboard');
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: (payload: FollowUpPayload) => bookFollowUp(appointmentId!, payload),
+    onSuccess: () => {
+      setFollowUpOpen(false);
+      setError('');
+      setInfo(t('followUp.booked', 'Follow-up booked for {{name}}.', { name: patientName }));
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+    onError: (err) => {
+      const message = getErrorMessage(err);
+      setError(message);
+      toast.error(message);
+    },
+  });
+
+  const referralMutation = useMutation({
+    mutationFn: (payload: ReferralPayload) => referPatient(appointmentId!, payload),
+    onSuccess: (data) => {
+      setReferralOpen(false);
+      setError('');
+      setInfo(
+        data.appointment
+          ? t(
+              'referral.sentWithAppointment',
+              'Referral sent and an appointment was requested for {{name}}.',
+              { name: patientName },
+            )
+          : t('referral.sent', 'Referral sent for {{name}}.', { name: patientName }),
+      );
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+    onError: (err) => {
+      const message = getErrorMessage(err);
+      setError(message);
+      toast.error(message);
+    },
+  });
+
+  const startMutation = useMutation({
+    mutationFn: () => startConsultation(appointmentId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointment', appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
@@ -208,6 +278,7 @@ export function ConsultationScreen() {
             ? parseFloat(vitals.oxygenSaturation)
             : undefined,
         },
+        chiefComplaint: chiefComplaint.trim() || undefined,
         symptoms: symptoms.split(',').map((s) => s.trim()).filter(Boolean),
         diagnosis: diagnoses.filter((d) => d.trim()).join('; ') || 'Draft - pending',
         treatment: treatment || undefined,
@@ -225,6 +296,58 @@ export function ConsultationScreen() {
   const removeDiagnosis = (index: number) => setDiagnoses(diagnoses.filter((_, i) => i !== index));
 
   if (loadingAppointment || loadingPatient || checkingRecord) return <PageSpinner />;
+
+  const canStartConsultation =
+    appointment?.status === 'Confirmed' || appointment?.status === 'Checked In';
+
+  if (appointment && !existingRecord && appointment.status !== 'In Progress') {
+    return (
+      <div className="mx-auto max-w-lg">
+        <Card>
+          <CardBody className="space-y-4 py-10 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+              <Stethoscope className="h-7 w-7" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900">
+              {canStartConsultation
+                ? t('consultation.readyTitle', 'Start this consultation')
+                : t('consultation.notReadyTitle', 'This appointment is not ready for consultation')}
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-500">
+              {canStartConsultation
+                ? t(
+                    'consultation.readyHint',
+                    'Start the visit before recording vitals, diagnosis, prescriptions, or lab requests.',
+                  )
+                : t(
+                    'consultation.notReadyHint',
+                    'Only confirmed, checked-in, or in-progress appointments can be consulted.',
+                  )}
+            </p>
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+                {error}
+              </div>
+            )}
+            <div className="flex justify-center gap-3">
+              <Button variant="secondary" onClick={() => navigate(-1)}>
+                {t('common.back', 'Back')}
+              </Button>
+              {canStartConsultation && (
+                <Button
+                  icon={PlayCircle}
+                  loading={startMutation.isPending}
+                  onClick={() => startMutation.mutate()}
+                >
+                  {t('doctorAppointments.startConsultation', 'Start consultation')}
+                </Button>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
 
   if (existingRecord) {
     return (
@@ -247,6 +370,7 @@ export function ConsultationScreen() {
     { key: 'record', label: t('consultation.stepRecord', 'Diagnosis'), icon: Stethoscope },
     { key: 'prescription', label: t('consultation.stepPrescription', 'Rx'), icon: Pill },
     { key: 'labs', label: t('consultation.stepLabs', 'Labs'), icon: FlaskConical },
+    { key: 'follow-up', label: t('consultation.stepFollowUp', 'Follow-up'), icon: CalendarCheck },
     { key: 'done', label: t('consultation.stepDone', 'Done'), icon: CheckCircle },
   ];
   const stepIndex = steps.findIndex((s) => s.key === step);
@@ -377,6 +501,14 @@ export function ConsultationScreen() {
         <Card>
           <CardHeader title={t('consultation.diagnosis', 'Diagnosis & Notes')} subtitle={t('consultation.diagnosisHint', 'Record symptoms and diagnosis')} />
           <CardBody className="space-y-5">
+            <Input
+              label={t('consultation.chiefComplaint', 'Chief complaint')}
+              hint={t('consultation.chiefComplaintHint', 'The main reason the patient is being seen today')}
+              placeholder={t('consultation.chiefComplaintPlaceholder', 'e.g. Persistent chest pain for three days')}
+              value={chiefComplaint}
+              onChange={(e) => setChiefComplaint(e.target.value)}
+              icon={Stethoscope}
+            />
             <Input label={t('consultation.symptoms', 'Symptoms')} hint={t('consultation.commaSeparated', 'Separate with commas')} placeholder="Fever, headache, cough" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} icon={Stethoscope} />
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -514,7 +646,90 @@ export function ConsultationScreen() {
             {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">{error}</div>}
             <div className="flex justify-between gap-2 border-t border-slate-100 pt-4">
               <Button variant="ghost" onClick={() => setStep('prescription')}>{t('common.back', 'Back')}</Button>
-              <Button onClick={() => setStep('done')}>{t('consultation.proceedComplete', 'Proceed to Complete')}</Button>
+              <Button onClick={() => setStep('follow-up')}>{t('consultation.proceedComplete', 'Proceed')}</Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {step === 'follow-up' && (
+        <Card>
+          <CardHeader
+            title={t('consultation.followUpTitle', 'Follow-up & referrals')}
+            subtitle={t(
+              'consultation.followUpHint',
+              'Optionally arrange the next visit or refer the patient before completing.',
+            )}
+          />
+          <CardBody className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setInfo('');
+                  setFollowUpOpen(true);
+                }}
+                disabled={!appointmentDoctorId || followUpMutation.isPending}
+                className="group rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-primary-300 hover:bg-primary-50/40 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                  <CalendarPlus className="h-5 w-5" />
+                </span>
+                <span className="mt-3 block text-sm font-semibold text-slate-900">
+                  {t('consultation.bookFollowUp', 'Book a follow-up')}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                  {t(
+                    'consultation.bookFollowUpHint',
+                    'Reserve another slot with you, confirmed now or left pending for the patient.',
+                  )}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setInfo('');
+                  setReferralOpen(true);
+                }}
+                disabled={!appointmentId || referralMutation.isPending}
+                className="group rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-primary-300 hover:bg-primary-50/40 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                  <UserPlus className="h-5 w-5" />
+                </span>
+                <span className="mt-3 block text-sm font-semibold text-slate-900">
+                  {t('consultation.referPatient', 'Refer the patient')}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                  {t(
+                    'consultation.referPatientHint',
+                    'Send the patient to another doctor with a note; optionally request an appointment.',
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {info && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                {info}
+              </div>
+            )}
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+                {error}
+              </div>
+            )}
+
+            <div className="flex justify-between gap-2 border-t border-slate-100 pt-4">
+              <Button variant="ghost" onClick={() => setStep('labs')}>
+                {t('common.back', 'Back')}
+              </Button>
+              <Button onClick={() => setStep('done')}>
+                {t('consultation.followUpContinue', 'Continue to complete')}
+              </Button>
             </div>
           </CardBody>
         </Card>
@@ -538,7 +753,7 @@ export function ConsultationScreen() {
             )}
             {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">{error}</div>}
             <div className="flex justify-center gap-3 pt-2">
-              <Button variant="secondary" onClick={() => setStep('labs')}>{t('common.back', 'Back')}</Button>
+              <Button variant="secondary" onClick={() => setStep('follow-up')}>{t('common.back', 'Back')}</Button>
               <Button onClick={() => completeMutation.mutate()} loading={completeMutation.isPending} icon={CheckCircle} className="min-w-[200px]">
                 {t('consultation.markCompleted', 'Mark as Completed')}
               </Button>
@@ -546,6 +761,23 @@ export function ConsultationScreen() {
           </CardBody>
         </Card>
       )}
+
+      <FollowUpModal
+        open={followUpOpen}
+        doctorId={appointmentDoctorId}
+        initialDate={appointment?.appointmentDate}
+        onClose={() => !followUpMutation.isPending && setFollowUpOpen(false)}
+        onConfirm={(payload) => followUpMutation.mutate(payload)}
+        loading={followUpMutation.isPending}
+      />
+
+      <ReferralModal
+        open={referralOpen}
+        excludeDoctorId={appointmentDoctorId}
+        onClose={() => !referralMutation.isPending && setReferralOpen(false)}
+        onConfirm={(payload) => referralMutation.mutate(payload)}
+        loading={referralMutation.isPending}
+      />
     </div>
   );
 }
@@ -565,6 +797,14 @@ function ExistingRecordView({ record, appointmentId }: { record: import('../../s
               <div>
                 <dt className="font-medium text-slate-500">{t('consultation.vitals', 'Vitals')}</dt>
                 <dd className="mt-1"><VitalsDisplay vitals={record.vitals as Record<string, unknown>} /></dd>
+              </div>
+            )}
+            {record.chiefComplaint && (
+              <div>
+                <dt className="font-medium text-slate-500">
+                  {t('consultation.chiefComplaint', 'Chief complaint')}
+                </dt>
+                <dd className="text-slate-700">{record.chiefComplaint}</dd>
               </div>
             )}
             {record.symptoms.length > 0 && (

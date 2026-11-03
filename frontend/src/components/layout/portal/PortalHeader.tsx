@@ -7,7 +7,7 @@ import { useLogoutConfirmation } from '../../../hooks/useLogoutConfirmation';
 import { UserAvatar } from '../../ui/UserAvatar';
 import { NotificationPanel } from '../../ui/NotificationPanel';
 import {
-  Menu, Bell, LogOut, ChevronDown,
+  Menu, Bell, LogOut,
 } from 'lucide-react';
 
 interface Props {
@@ -95,7 +95,7 @@ export function PortalHeader({ onOpenMobile }: Props) {
               aria-haspopup="true"
             >
               <UserAvatar name={user?.fullName} imageUrl={user?.profileImageUrl} size="sm" />
-              <ChevronDown className={`h-3.5 w-3.5 text-text-muted transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              
             </button>
             {profileOpen && (
               <div className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-card py-1 shadow-md dark:border-slate-800 dark:bg-slate-900">

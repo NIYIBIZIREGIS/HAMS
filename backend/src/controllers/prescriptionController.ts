@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { Prescription, MedicalRecord, Doctor, Patient } from '../models';
+import { Prescription, MedicalRecord, Doctor, Patient, Notification } from '../models';
 import { success } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 import { buildPrescriptionHtml } from '../services/pdfService';
@@ -56,6 +56,7 @@ export async function createPrescription(req: AuthRequest, res: Response) {
 
   const prescription = await Prescription.create({
     medicalRecordId: body.medicalRecordId,
+    appointmentId: medicalRecord.appointmentId,
     patientId: medicalRecord.patientId,
     doctorId: doctor._id,
     facilityId: doctor.facilityId,
@@ -63,6 +64,21 @@ export async function createPrescription(req: AuthRequest, res: Response) {
     instructions: body.instructions,
     issuedAt: new Date(),
   });
+
+  try {
+    await Notification.create({
+      patientId: medicalRecord.patientId,
+      facilityId: doctor.facilityId,
+      appointmentId: medicalRecord.appointmentId,
+      recipientType: 'patient',
+      type: 'prescription',
+      title: 'New prescription',
+      body: `A prescription with ${body.medicines.length} medicine(s) is now available in your prescriptions.`,
+      link: '/prescriptions',
+    });
+  } catch (err) {
+    console.error('[notification] prescription notify failed:', err instanceof Error ? err.message : err);
+  }
 
   // Include allergy warnings in the response (non-blocking)
   success(res, 201, { prescription, allergyWarnings });
@@ -155,6 +171,9 @@ export async function listPrescriptions(req: AuthRequest, res: Response) {
   // patient read somebody else's prescriptions.
   if (req.query.patientId && !hasRole(req.user, ROLE_PATIENT)) {
     filter.patientId = req.query.patientId;
+  }
+  if (req.query.appointmentId) {
+    filter.appointmentId = req.query.appointmentId;
   }
 
   // Identity constraints win over caller-supplied filters.

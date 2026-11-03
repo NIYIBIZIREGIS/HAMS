@@ -143,6 +143,12 @@ function ExpandableCard({ entry, t }: { entry: TimelineEntry; t: (key: string) =
 function ConsultationDetails({ record, t }: { record: MedicalRecord; t: (key: string) => string }) {
   return (
     <div className="space-y-3 text-sm">
+      {record.chiefComplaint && (
+        <div>
+          <p className="font-medium text-text-main">{t('consultation.chiefComplaint')}</p>
+          <p className="text-text-muted">{record.chiefComplaint}</p>
+        </div>
+      )}
       {record.symptoms?.length > 0 && (
         <div>
           <p className="font-medium text-text-main">{t('consultation.symptoms')}</p>

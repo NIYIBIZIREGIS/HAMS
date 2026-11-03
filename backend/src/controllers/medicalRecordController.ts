@@ -47,6 +47,7 @@ export async function createMedicalRecord(req: AuthRequest, res: Response) {
   const body = req.body as {
     appointmentId: string;
     vitals?: Record<string, unknown>;
+    chiefComplaint?: string;
     symptoms?: string[];
     diagnosis: string;
     treatment?: string;
@@ -103,6 +104,7 @@ export async function createMedicalRecord(req: AuthRequest, res: Response) {
         {
           doctorId: profileId,
           vitals: body.vitals ?? existing.vitals,
+          chiefComplaint: body.chiefComplaint ?? existing.chiefComplaint,
           symptoms: body.symptoms ?? existing.symptoms,
           diagnosis: body.diagnosis,
           treatment: body.treatment,
@@ -122,6 +124,7 @@ export async function createMedicalRecord(req: AuthRequest, res: Response) {
     appointmentId: body.appointmentId,
     facilityId: appointment.facilityId,
     vitals: body.vitals ?? {},
+    chiefComplaint: body.chiefComplaint,
     symptoms: body.symptoms ?? [],
     diagnosis: isNurse ? 'Vitals recorded by nurse — awaiting doctor consultation' : body.diagnosis,
     treatment: body.treatment,
@@ -218,6 +221,7 @@ export async function updateMedicalRecord(req: AuthRequest, res: Response) {
   const updates: Record<string, unknown> = {};
   for (const field of [
     'vitals',
+    'chiefComplaint',
     'symptoms',
     'diagnosis',
     'treatment',
@@ -298,6 +302,7 @@ export async function getPatientTimeline(req: AuthRequest, res: Response) {
   const recordSearch: Record<string, unknown> = searchPattern
     ? {
         $or: [
+          { chiefComplaint: searchPattern },
           { diagnosis: searchPattern },
           { treatment: searchPattern },
           { notes: searchPattern },

@@ -9,7 +9,9 @@ const STATUS_COLORS: Record<string, string> = {
   Cancelled: 'bg-status-cancelled-bg text-status-cancelled-text border-status-cancelled-bg',
   Missed: 'bg-status-cancelled-bg text-status-cancelled-text border-status-cancelled-bg',
   'No Show': 'bg-status-cancelled-bg text-status-cancelled-text border-status-cancelled-bg',
+  Declined: 'bg-status-cancelled-bg text-status-cancelled-text border-status-cancelled-bg',
   Rejected: 'bg-status-cancelled-bg text-status-cancelled-text border-status-cancelled-bg',
+  'Reschedule Proposed': 'bg-status-pending-bg text-status-pending-text border-status-pending-bg',
 };
 
 export function StatusBadge({ status }: { status: string }) {

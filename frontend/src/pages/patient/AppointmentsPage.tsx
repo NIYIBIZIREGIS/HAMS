@@ -2,14 +2,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Calendar, CalendarPlus, Filter, AlertCircle, Eye, XCircle, MapPin, Stethoscope,
+  Calendar, CalendarPlus, Filter, AlertCircle, CheckCircle2, Eye, XCircle, MapPin, Stethoscope,
 } from 'lucide-react';
-import { cancelAppointment, listAppointmentsPage, type Appointment } from '../../services/api';
+import {
+  cancelAppointment,
+  listAppointmentsPage,
+  respondToRescheduleProposal,
+  type Appointment,
+} from '../../services/api';
 import { StatusBadge } from '../../components/appointments/StatusBadge';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Pagination } from '../../components/ui/Pagination';
+import { toast } from '../../store/toastStore';
 
 type Tab = 'all' | 'upcoming' | 'completed' | 'cancelled';
 
@@ -23,11 +29,11 @@ const PAGE_SIZE = 10;
 const TAB_FILTERS: Record<Tab, { status?: string; dateFrom?: string }> = {
   all: {},
   upcoming: {
-    status: 'Pending,Confirmed,Checked In,In Progress',
+    status: 'Pending,Confirmed,Checked In,In Progress,Reschedule Proposed',
     dateFrom: new Date().toISOString().slice(0, 10),
   },
   completed: { status: 'Completed' },
-  cancelled: { status: 'Cancelled,Rejected,Missed' },
+  cancelled: { status: 'Cancelled,Declined,Rejected,Missed' },
 };
 
 export function AppointmentsPage() {
@@ -43,6 +49,7 @@ export function AppointmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [proposalActionId, setProposalActionId] = useState<string | null>(null);
 
   const fetchData = useCallback(async (targetPage: number) => {
     setLoading(true);
@@ -92,6 +99,23 @@ export function AppointmentsPage() {
       setError(t('common.error'));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleProposal = async (appointment: Appointment, decision: 'accept' | 'reject') => {
+    setProposalActionId(appointment._id);
+    try {
+      await respondToRescheduleProposal(appointment._id, decision);
+      toast.success(
+        decision === 'accept'
+          ? t('portal.appointments.proposalAccepted')
+          : t('portal.appointments.proposalRejected')
+      );
+      await fetchData(page);
+    } catch {
+      setError(t('common.error'));
+    } finally {
+      setProposalActionId(null);
     }
   };
 
@@ -169,7 +193,19 @@ export function AppointmentsPage() {
                     <td className="px-5 py-3.5 font-medium text-text-main dark:text-white">
                       {new Date(a.appointmentDate).toLocaleDateString()}
                     </td>
-                    <td className="px-5 py-3.5 text-text-muted dark:text-slate-400">{a.timeSlot}</td>
+                    <td className="px-5 py-3.5 text-text-muted dark:text-slate-400">
+                      {a.timeSlot}
+                      {a.status === 'Reschedule Proposed' && a.proposedTimeSlot && (
+                        <span className="mt-0.5 block text-xs font-semibold text-status-pending-text">
+                          {t('portal.appointments.proposedFor', {
+                            date: a.proposedDate
+                              ? new Date(a.proposedDate).toLocaleDateString()
+                              : '',
+                            time: a.proposedTimeSlot,
+                          })}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center gap-1.5 text-text-muted dark:text-slate-400">
                         <MapPin className="h-3.5 w-3.5" /> {departmentName(a)}
@@ -184,6 +220,30 @@ export function AppointmentsPage() {
                     <td className="px-5 py-3.5"><StatusBadge status={a.status} /></td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-1">
+                        {a.status === 'Reschedule Proposed' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void handleProposal(a, 'accept')}
+                              disabled={proposalActionId === a._id}
+                              className="rounded-xl p-1.5 text-status-confirmed-text transition-colors hover:bg-status-confirmed-bg disabled:opacity-50"
+                              aria-label={t('portal.appointments.acceptProposal')}
+                              title={t('portal.appointments.acceptProposal')}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleProposal(a, 'reject')}
+                              disabled={proposalActionId === a._id}
+                              className="rounded-xl p-1.5 text-status-cancelled-text transition-colors hover:bg-status-cancelled-bg disabled:opacity-50"
+                              aria-label={t('portal.appointments.rejectProposal')}
+                              title={t('portal.appointments.rejectProposal')}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                         {canCancel(a) && (
                           <button
                             type="button"

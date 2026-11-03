@@ -133,7 +133,7 @@ export function MasterDataPage() {
     }
   };
 
-  const filtered = (data ?? []).filter((item) =>
+  const list = Array.isArray(data) ? data : []; const filtered = list.filter((item) =>
     !search || item.name.toLowerCase().includes(search.toLowerCase())
   );
 

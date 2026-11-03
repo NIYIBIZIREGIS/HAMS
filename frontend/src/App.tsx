@@ -31,6 +31,9 @@ import { MyFacilitiesPage } from './pages/patient/MyFacilitiesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AvailabilityManager } from './pages/doctor/AvailabilityManager';
 import { ConsultationScreen } from './pages/doctor/ConsultationScreen';
+import { DoctorAppointmentsPage } from './pages/doctor/DoctorAppointmentsPage';
+import { DoctorAppointmentDetailPage } from './pages/doctor/DoctorAppointmentDetailPage';
+import { DoctorCalendarPage } from './pages/doctor/DoctorCalendarPage';
 import { FacilityAdminDashboard } from './pages/admin/FacilityAdminDashboard';
 import { SuperAdminOverview } from './pages/superadmin/SuperAdminOverview';
 import { FacilityRegistryPage } from './pages/superadmin/FacilityRegistryPage';
@@ -108,6 +111,12 @@ export default function App() {
               <Route path="/availability" element={<AvailabilityManager />} />
             </Route>
 
+            <Route element={<ProtectedRoute roles={['doctor']} />}>
+              <Route path="/doctor/appointments" element={<DoctorAppointmentsPage />} />
+              <Route path="/doctor/appointments/:id" element={<DoctorAppointmentDetailPage />} />
+              <Route path="/doctor/calendar" element={<DoctorCalendarPage />} />
+            </Route>
+
             <Route element={<ProtectedRoute roles={['doctor', 'facility_admin', 'super_admin']} />}>
               <Route path="/consultation/:appointmentId" element={<ConsultationScreen />} />
             </Route>
@@ -124,7 +133,7 @@ export default function App() {
               <Route path="/lab-results" element={<LabResultsPage />} />
             </Route>
 
-            <Route element={<ProtectedRoute roles={['patient']} />}>
+            <Route element={<ProtectedRoute roles={['patient', 'doctor']} />}>
               <Route path="/messages" element={<MessagesPage />} />
             </Route>
 

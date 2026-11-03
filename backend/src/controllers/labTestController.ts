@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { LaboratoryTest, Appointment, Doctor, Patient, MedicalRecord } from '../models';
+import { LaboratoryTest, Appointment, Doctor, Patient, MedicalRecord, Notification } from '../models';
 import { success, paginate } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 import {
@@ -62,7 +62,20 @@ export async function createLabTest(req: AuthRequest, res: Response) {
   });
 
   // Stub notification — Phase 5 will send a real alert to the lab
-  void notifyLabStub(String(labTest._id), body.testName);
+  try {
+    await Notification.create({
+      patientId: appointment.patientId,
+      facilityId: appointment.facilityId,
+      appointmentId: appointment._id,
+      recipientType: 'patient',
+      type: 'lab_result',
+      title: 'Lab test requested',
+      body: `${body.testName} has been requested and will appear in your lab results.`,
+      link: '/lab-results',
+    });
+  } catch (err) {
+    console.error('[notification] lab request notify failed:', err instanceof Error ? err.message : err);
+  }
 
   success(res, 201, labTest);
 }
@@ -111,8 +124,32 @@ export async function updateLabTest(req: AuthRequest, res: Response) {
   });
 
   // Stub notification for abnormal results — Phase 5 will send a real alert
-  if (body.isAbnormal && body.status === 'Completed') {
-    void notifyAbnormalResultStub(String(labTest._id), labTest.testName);
+  if (body.status === 'Completed') {
+    const abnormal = Boolean(updated?.isAbnormal);
+    try {
+      await Notification.create({
+        patientId: labTest.patientId,
+        facilityId: labTest.facilityId,
+        appointmentId: labTest.appointmentId,
+        recipientType: 'patient',
+        type: 'lab_result',
+        title: abnormal ? 'Abnormal lab result' : 'Lab result available',
+        body: `${labTest.testName} has a result available in your lab results.`,
+        link: '/lab-results',
+      });
+      await Notification.create({
+        doctorId: labTest.requestedBy,
+        facilityId: labTest.facilityId,
+        appointmentId: labTest.appointmentId,
+        recipientType: 'doctor',
+        type: 'lab_result',
+        title: abnormal ? 'Abnormal lab result' : 'Lab result available',
+        body: `${labTest.testName} has a result available.`,
+        link: `/doctor/appointments/${String(labTest.appointmentId)}`,
+      });
+    } catch (err) {
+      console.error('[notification] lab result notify failed:', err instanceof Error ? err.message : err);
+    }
   }
 
   success(res, 200, updated);
@@ -187,14 +224,4 @@ export async function getLabTest(req: AuthRequest, res: Response) {
   }
 
   success(res, 200, labTest);
-}
-
-// ── stubs (Phase 5 will implement real notifications) ────────────────────────
-
-async function notifyLabStub(testId: string, testName: string) {
-  console.log(`[notify-stub] Lab test requested: ${testId} — ${testName}`);
-}
-
-async function notifyAbnormalResultStub(testId: string, testName: string) {
-  console.log(`[notify-stub] Abnormal result flagged: ${testId} — ${testName} — doctor/patient to be notified`);
 }

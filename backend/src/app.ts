@@ -10,6 +10,7 @@ import { RawBodyRequest } from './types/request';
 import { swaggerSpec } from './config/swagger';
 import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
+import masterDataRoutes from './routes/masterDataRoutes';
 import facilityRoutes from './routes/facilityRoutes';
 import userRoutes from './routes/userRoutes';
 import departmentRoutes from './routes/departmentRoutes';
@@ -78,6 +79,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/master-data', masterDataRoutes);
 app.use('/api/facilities', facilityRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/departments', departmentRoutes);
@@ -95,6 +97,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/patient-documents', patientDocumentRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/master-data', masterDataRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

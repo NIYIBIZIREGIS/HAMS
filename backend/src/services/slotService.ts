@@ -11,6 +11,8 @@ export interface AvailableSlot {
 export interface GenerateSlotsParams {
   doctorId: string;
   date: Date | string;
+  /** Rescheduling an existing appointment must not count that appointment against itself. */
+  excludeAppointmentId?: string;
 }
 
 function startOfDay(date: Date): Date {
@@ -33,8 +35,13 @@ function endOfDay(date: Date): Date {
  * booked with a non-cancelled appointment. Booked slots show `available: 0` so the
  * frontend can render them disabled.
  */
-export async function generateSlots({ doctorId, date }: GenerateSlotsParams): Promise<AvailableSlot[]> {
-  const day = new Date(date);
+export async function generateSlots({
+  doctorId,
+  date,
+  excludeAppointmentId,
+}: GenerateSlotsParams): Promise<AvailableSlot[]> {
+  const input = (date ?? '').toString();
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(input) ? new Date(`${input}T00:00:00`) : new Date(date);
   const dayOfWeek = day.getDay();
 
   const schedule = await DoctorSchedule.findOne({
@@ -74,11 +81,14 @@ export async function generateSlots({ doctorId, date }: GenerateSlotsParams): Pr
     });
   }
 
-  const booked = await Appointment.find({
+  const bookedFilter: Record<string, unknown> = {
     doctorId,
     appointmentDate: { $gte: startOfDay(day), $lte: endOfDay(day) },
-    status: { $nin: ['Cancelled', 'Rejected'] },
-  })
+    status: { $nin: ['Cancelled', 'Declined', 'Rejected'] },
+  };
+  if (excludeAppointmentId) bookedFilter._id = { $ne: excludeAppointmentId };
+
+  const booked = await Appointment.find(bookedFilter)
     .select('timeSlot status')
     .lean();
 

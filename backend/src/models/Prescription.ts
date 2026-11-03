@@ -10,6 +10,7 @@ export interface IPrescriptionMedicine {
 
 export interface IPrescription extends Document {
   medicalRecordId: Types.ObjectId;
+  appointmentId?: Types.ObjectId;
   patientId: Types.ObjectId;
   doctorId: Types.ObjectId;
   facilityId: Types.ObjectId;
@@ -34,6 +35,7 @@ const medicineSchema = new Schema<IPrescriptionMedicine>(
 const prescriptionSchema = new Schema<IPrescription>(
   {
     medicalRecordId: { type: Schema.Types.ObjectId, ref: 'MedicalRecords', required: true },
+    appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointments', default: null },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patients', required: true },
     doctorId: { type: Schema.Types.ObjectId, ref: 'Doctors', required: true },
     facilityId: { type: Schema.Types.ObjectId, ref: 'Facilities', required: true },
@@ -45,6 +47,7 @@ const prescriptionSchema = new Schema<IPrescription>(
 );
 
 prescriptionSchema.index({ medicalRecordId: 1 });
+prescriptionSchema.index({ appointmentId: 1 });
 prescriptionSchema.index({ patientId: 1, issuedAt: -1 });
 prescriptionSchema.index({ doctorId: 1, issuedAt: -1 });
 prescriptionSchema.index({ facilityId: 1 });

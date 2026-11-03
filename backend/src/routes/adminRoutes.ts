@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as adminController from '../controllers/adminController';
+import * as auditLogController from '../controllers/auditLogController';
 import { authenticate } from '../middleware/auth';
 import { requireRole, requirePermission } from '../middleware/rbac';
 import { PERMISSIONS } from '../utils/permissions';
@@ -16,6 +17,23 @@ router.get(
   authenticate,
   requireRole('super_admin'),
   asyncHandler(adminController.getGlobalAnalytics)
+);
+
+router.get(
+  '/audit-logs',
+  authenticate,
+  requireRole('super_admin', 'auditor'),
+  requirePermission(PERMISSIONS.AUDIT_VIEW),
+  asyncHandler(auditLogController.listAuditLogs)
+);
+
+router.get(
+  '/audit-logs/:id',
+  authenticate,
+  requireRole('super_admin', 'auditor'),
+  requirePermission(PERMISSIONS.AUDIT_VIEW),
+  validateObjectId('id'),
+  asyncHandler(auditLogController.getAuditLog)
 );
 
 router.get(

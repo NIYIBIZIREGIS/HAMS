@@ -5,6 +5,7 @@ import { useLogoutConfirmation } from '../../../hooks/useLogoutConfirmation';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   CalendarPlus,
   FileText,
   Settings,
@@ -57,7 +58,10 @@ const ROLE_LINKS: Record<string, SidebarLink[]> = {
   ],
   doctor: [
     { to: '/dashboard', icon: LayoutDashboard, labelKey: 'portal.sidebar.dashboard', end: true },
+    { to: '/doctor/appointments', icon: Calendar, labelKey: 'portal.sidebar.doctorAppointments' },
+    { to: '/doctor/calendar', icon: CalendarDays, labelKey: 'portal.sidebar.calendar' },
     { to: '/availability', icon: Clock, labelKey: 'portal.sidebar.availability' },
+    { to: '/messages', icon: Mail, labelKey: 'portal.sidebar.messages' },
   ],
   receptionist: [
     { to: '/dashboard', icon: LayoutDashboard, labelKey: 'portal.sidebar.dashboard', end: true },

@@ -10,6 +10,7 @@ import {
 import { Card } from '../../components/ui/Card';
 import { PageSpinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
+import { useAuthStore } from '../../store/authStore';
 import {
   Search,
   Inbox,
@@ -26,6 +27,8 @@ const PAGE_SIZE = 20;
 
 export function MessagesPage() {
   const { t } = useTranslation();
+  const user = useAuthStore((state) => state.user);
+  const ownDirection = user?.role === 'patient' ? 'to_staff' : 'to_patient';
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
@@ -201,8 +204,8 @@ export function MessagesPage() {
                     ) : (
                       <div className="space-y-3">
                         {messages.map((message) => {
-                          // Replies the patient wrote sit on the right, hospital mail on the left.
-                          const own = message.direction === 'to_staff';
+                          // The caller's own messages sit on the right; the other side's on the left.
+                          const own = message.direction === ownDirection;
                           return (
                             <div
                               key={message._id}

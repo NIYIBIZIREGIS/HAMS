@@ -9,6 +9,7 @@ export interface BookAppointmentInput {
   patientId: string;
   doctorId: string;
   departmentId: string;
+  
   appointmentDate: Date;
   timeSlot: string;
   reason?: string;
@@ -59,7 +60,7 @@ export async function bookAppointment(input: BookAppointmentInput) {
     doctorId: input.doctorId,
     appointmentDate: day,
     timeSlot: input.timeSlot,
-    status: { $nin: ['Cancelled', 'Rejected'] },
+    status: { $nin: ['Cancelled', 'Declined', 'Rejected'] },
   });
   const maxPerSlot = schedule.maxPatientsPerSlot ?? 1;
   if (existing >= maxPerSlot) {
@@ -100,14 +101,16 @@ export async function nextQueueNumber(facilityId: string, date: Date): Promise<n
 }
 
 export const statusFlow: Record<AppointmentStatus, AppointmentStatus[]> = {
-  Pending: ['Confirmed', 'Rejected', 'Cancelled'],
-  Confirmed: ['Checked In', 'Cancelled', 'Missed'],
+  Pending: ['Confirmed', 'Declined', 'Rejected', 'Cancelled', 'Reschedule Proposed'],
+  Confirmed: ['Checked In', 'In Progress', 'Cancelled', 'Missed'],
   'Checked In': ['In Progress', 'Cancelled', 'Missed'],
   'In Progress': ['Completed'],
   Completed: [],
   Cancelled: [],
   Missed: [],
+  Declined: [],
   Rejected: [],
+  'Reschedule Proposed': ['Confirmed', 'Declined', 'Cancelled'],
 };
 
 export function assertValidTransition(from: AppointmentStatus, to: AppointmentStatus): void {
