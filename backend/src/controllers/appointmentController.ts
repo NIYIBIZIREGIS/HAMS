@@ -13,6 +13,7 @@ import {
   MedicalRecord,
   LaboratoryTest,
   PatientDocument,
+  Message,
 } from '../models';
 import { success, paginate } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
@@ -435,6 +436,130 @@ export async function updateAppointmentMeetingLink(req: AuthRequest, res: Respon
   }
 
   success(res, 200, updated);
+}
+
+async function notifyPatientAboutChatMessage(
+  appointment: IAppointment,
+  body: string
+): Promise<void> {
+  try {
+    await Notification.create({
+      patientId: appointment.patientId,
+      facilityId: appointment.facilityId,
+      recipientType: 'patient',
+      type: 'message',
+      title: 'New message from your doctor',
+      body,
+      link: '/messages',
+    });
+  } catch (err) {
+    console.error(
+      '[notification] consultation chat notify failed:',
+      err instanceof Error ? err.message : err
+    );
+  }
+}
+
+/**
+ * Consultation chat is scoped to one appointment rather than the general inbox. It is only
+ * available once the doctor has moved the visit to "In Progress", which keeps the conversation
+ * tied to an active consultation and gives the backend the same gate the UI shows.
+ */
+export async function getAppointmentChat(req: AuthRequest, res: Response) {
+  const appointment = await Appointment.findById(req.params.id);
+  if (!appointment) throw new AppError(404, 'Appointment not found');
+  await assertAccess(req, appointment);
+
+  if (appointment.status !== 'In Progress') {
+    throw new AppError(409, 'Chat is available once the consultation has started');
+  }
+
+  const root = await Message.findOne({
+    appointmentId: appointment._id,
+    patientId: appointment.patientId,
+    facilityId: appointment.facilityId,
+  }).sort({ createdAt: 1 });
+
+  if (!root) {
+    success(res, 200, { threadId: null, messages: [] });
+    return;
+  }
+
+  const threadId = root.threadId ?? root._id;
+  const messages = await Message.find({
+    appointmentId: appointment._id,
+    $or: [{ threadId }, { _id: threadId }],
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  await Message.updateMany(
+    {
+      _id: { $in: messages.map((message) => message._id) },
+      direction: 'to_staff',
+      isRead: false,
+    },
+    { $set: { isRead: true, readAt: new Date() } }
+  );
+
+  success(res, 200, { threadId, messages });
+}
+
+export async function sendAppointmentChatMessage(req: AuthRequest, res: Response) {
+  const appointment = await Appointment.findById(req.params.id);
+  if (!appointment) throw new AppError(404, 'Appointment not found');
+  await assertAccess(req, appointment);
+
+  if (appointment.status !== 'In Progress') {
+    throw new AppError(409, 'Chat is available once the consultation has started');
+  }
+
+  const { body } = req.body as { body: string };
+  const sender = await User.findById(req.user!.id).select('fullName').lean();
+  const senderName = sender?.fullName ?? 'Doctor';
+
+  const root = await Message.findOne({
+    appointmentId: appointment._id,
+    patientId: appointment.patientId,
+    facilityId: appointment.facilityId,
+  }).sort({ createdAt: 1 });
+
+  let message;
+  if (root) {
+    message = await Message.create({
+      facilityId: appointment.facilityId,
+      patientId: appointment.patientId,
+      appointmentId: appointment._id,
+      threadId: root.threadId ?? root._id,
+      direction: 'to_patient',
+      senderUserId: req.user!.id,
+      senderName,
+      subject: root.subject,
+      body,
+      isRead: false,
+    });
+  } else {
+    message = await Message.create({
+      facilityId: appointment.facilityId,
+      patientId: appointment.patientId,
+      appointmentId: appointment._id,
+      direction: 'to_patient',
+      senderUserId: req.user!.id,
+      senderName,
+      subject: `Consultation chat - ${formatAppointmentDate(appointment.appointmentDate)}`,
+      body,
+      isRead: false,
+    });
+    message.threadId = message._id;
+    await message.save();
+  }
+
+  await notifyPatientAboutChatMessage(
+    appointment,
+    `You have a new consultation message from ${senderName}.`
+  );
+
+  success(res, 201, message);
 }
 
 export async function acceptAppointment(req: AuthRequest, res: Response) {

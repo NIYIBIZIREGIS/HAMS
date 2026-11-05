@@ -3,6 +3,8 @@ import { Schema, model, Document, Types } from 'mongoose';
 export interface IMessage extends Document {
   facilityId: Types.ObjectId;
   patientId: Types.ObjectId;
+  /** Appointment-scoped consultation chat; absent on general inbox messages. */
+  appointmentId?: Types.ObjectId;
   /**
    * Conversation key. The first message in a thread points at its own id; every reply points
    * back at the first. Stored on every row so a thread can be listed without a self-join.
@@ -28,6 +30,7 @@ const messageSchema = new Schema<IMessage>(
   {
     facilityId: { type: Schema.Types.ObjectId, ref: 'Facilities', required: true },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patients', required: true },
+    appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointments' },
     threadId: { type: Schema.Types.ObjectId, ref: 'Messages' },
     direction: { type: String, enum: ['to_patient', 'to_staff'], default: 'to_patient' },
     senderUserId: { type: Schema.Types.ObjectId, ref: 'Users' },
@@ -45,5 +48,6 @@ messageSchema.index({ facilityId: 1, createdAt: -1 });
 messageSchema.index({ patientId: 1, isRead: 1 });
 messageSchema.index({ threadId: 1, createdAt: 1 });
 messageSchema.index({ threadId: 1, isRead: 1 });
+messageSchema.index({ appointmentId: 1, createdAt: 1 });
 
 export const Message = model<IMessage>('Messages', messageSchema);

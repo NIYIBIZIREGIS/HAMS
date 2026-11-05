@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { useThemeStore } from '../store/themeStore';
 import { setLanguage } from '../i18n';
 import { getErrorMessage, setTokens } from '../services/client';
 import { changePassword } from '../services/auth';
@@ -11,7 +10,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { UserAvatar } from '../components/ui/UserAvatar';
 import {
-  User, Palette, Lock, Sun, Moon, Mail, Phone, IdCard, ShieldCheck, Save, HeartPulse, BadgeCheck, KeyRound,
+  User, Palette, Lock, Mail, Phone, IdCard, ShieldCheck, Save, HeartPulse, BadgeCheck, KeyRound,
   Camera, Trash2, Pencil,
 } from 'lucide-react';
 
@@ -60,7 +59,6 @@ export function SettingsPage() {
   const verifyEmailCode = useAuthStore((s) => s.verifyEmailCode);
   const sendPhoneCode = useAuthStore((s) => s.sendPhoneCode);
   const verifyPhoneCode = useAuthStore((s) => s.verifyPhoneCode);
-  const { theme, setTheme } = useThemeStore();
 
   const [emailSent, setEmailSent] = useState(false);
   const [emailCode, setEmailCode] = useState('');
@@ -389,28 +387,6 @@ export function SettingsPage() {
 
         <Section icon={Palette} title={t('portal.settings.preferencesTitle')} subtitle={t('portal.settings.preferencesSubtitle')}>
           <div className="space-y-6">
-          <div>
-            <p className="mb-3 text-sm font-semibold text-text-main dark:text-slate-300">{t('portal.settings.theme')}</p>
-            <div className="flex gap-2">
-              {([
-                { value: 'light', icon: Sun, label: t('portal.settings.light') },
-                { value: 'dark', icon: Moon, label: t('portal.settings.dark') },
-              ] as const).map(({ value, icon: Icon, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTheme(value)}
-                  className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    theme === value
-                      ? 'border-primary bg-primary text-white dark:border-primary dark:bg-primary dark:text-white'
-                      : 'border-slate-200 bg-surface text-text-muted hover:border-primary/50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" /> {label}
-                </button>
-              ))}
-            </div>
-          </div>
           <div>
             <p className="mb-3 text-sm font-semibold text-text-main dark:text-slate-300">{t('portal.settings.language')}</p>
             <div className="flex flex-wrap gap-2">

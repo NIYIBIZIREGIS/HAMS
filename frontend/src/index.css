@@ -7,10 +7,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
-}
-
-html.dark {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -19,15 +16,6 @@ body {
   font-size: 0.9375rem;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-.dark body,
-.dark {
-  @apply bg-slate-950 text-slate-100;
-}
-
-.dark body {
-  font-weight: 500;
 }
 
 :root {
@@ -81,22 +69,8 @@ body {
   --font-body: 'Nunito Sans', system-ui, sans-serif;
 }
 
-.dark {
-  --color-navy: #020617;
-  --color-page: #020617;
-  --color-surface: #0f172a;
-  --color-card: #1e293b;
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
-  --color-border: #334155;
-}
-
 :focus-visible {
   @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-white;
-}
-
-.dark :focus-visible {
-  @apply ring-primary-400 ring-offset-slate-950;
 }
 
 a:focus-visible,
@@ -105,14 +79,6 @@ select:focus-visible,
 textarea:focus-visible,
 button:focus-visible {
   @apply outline-none ring-2 ring-primary ring-offset-2;
-}
-
-.dark a:focus-visible,
-.dark input:focus-visible,
-.dark select:focus-visible,
-.dark textarea:focus-visible,
-.dark button:focus-visible {
-  @apply ring-primary-400 ring-offset-slate-950;
 }
 
 input,
@@ -124,10 +90,6 @@ button {
 
 ::selection {
   @apply bg-primary text-white;
-}
-
-.dark ::selection {
-  @apply bg-primary-400 text-white;
 }
 
 ::-webkit-scrollbar {
@@ -143,10 +105,6 @@ button {
   @apply rounded-full bg-slate-300;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700;
-}
-
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-500;
 }
@@ -157,16 +115,8 @@ button {
     background-image: linear-gradient(135deg, #0f172a 0%, #475569 50%, #0f172a 100%);
   }
 
-  .dark .text-gradient {
-    background-image: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 50%, #f1f5f9 100%);
-  }
-
   .glass {
     @apply border border-white/30 bg-white/80 backdrop-blur-xl;
-  }
-
-  .dark .glass {
-    @apply border-white/10 bg-slate-900/60;
   }
 }
 

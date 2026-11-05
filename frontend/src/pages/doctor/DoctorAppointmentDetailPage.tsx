@@ -321,7 +321,8 @@ export function DoctorAppointmentDetailPage() {
   ].includes(appointment.status);
   const isToday =
     appointment.appointmentDate.slice(0, 10) === new Date().toISOString().slice(0, 10);
-  const canStartOrMarkNoShow = (isConfirmed || isCheckedIn) && isToday;
+  const canStartConsultation = isConfirmed || isCheckedIn;
+  const canMarkNoShow = canStartConsultation && isToday;
   const doctorId =
     typeof appointment.doctorId === 'object' ? appointment.doctorId._id : appointment.doctorId;
   const department =
@@ -366,25 +367,25 @@ export function DoctorAppointmentDetailPage() {
 
             {(isConfirmed || isCheckedIn) && (
               <>
-                {canStartOrMarkNoShow && (
-                  <>
-                    <Button
-                      icon={PlayCircle}
-                      loading={actionLoading === 'start'}
-                      onClick={() => void handleStart()}
-                      disabled={Boolean(actionLoading)}
-                    >
-                      {t('doctorAppointments.startConsultation', 'Start consultation')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      icon={UserX}
-                      onClick={() => setNoShowOpen(true)}
-                      disabled={Boolean(actionLoading)}
-                    >
-                      {t('doctorAppointments.markNoShow', 'Mark no-show')}
-                    </Button>
-                  </>
+                {canStartConsultation && (
+                  <Button
+                    icon={PlayCircle}
+                    loading={actionLoading === 'start'}
+                    onClick={() => void handleStart()}
+                    disabled={Boolean(actionLoading)}
+                  >
+                    {t('doctorAppointments.startConsultation', 'Start consultation')}
+                  </Button>
+                )}
+                {canMarkNoShow && (
+                  <Button
+                    variant="danger"
+                    icon={UserX}
+                    onClick={() => setNoShowOpen(true)}
+                    disabled={Boolean(actionLoading)}
+                  >
+                    {t('doctorAppointments.markNoShow', 'Mark no-show')}
+                  </Button>
                 )}
                 <Button
                   variant="outline"

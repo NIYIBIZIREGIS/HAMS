@@ -90,7 +90,7 @@ export function PortalHeader({ onOpenMobile }: Props) {
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
               aria-expanded={profileOpen}
               aria-haspopup="true"
             >

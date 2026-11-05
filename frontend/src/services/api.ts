@@ -510,6 +510,21 @@ export async function updateAppointmentMeetingLink(id: string, meetingLink: stri
   return res.data.data as Appointment;
 }
 
+export interface AppointmentChat {
+  threadId: string | null;
+  messages: Message[];
+}
+
+export async function getAppointmentChat(id: string): Promise<AppointmentChat> {
+  const res = await client.get(`/appointments/${id}/chat`);
+  return res.data.data as AppointmentChat;
+}
+
+export async function sendAppointmentChatMessage(id: string, body: string): Promise<Message> {
+  const res = await client.post(`/appointments/${id}/chat`, { body });
+  return res.data.data as Message;
+}
+
 export async function cancelAppointment(id: string, cancellationReason?: string) {
   const res = await client.delete(`/appointments/${id}`, { data: { cancellationReason } });
   return res.data.data as Appointment;

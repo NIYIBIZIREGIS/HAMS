@@ -279,6 +279,7 @@ export async function replyToThread(req: AuthRequest, res: Response) {
   const reply = await Message.create({
     facilityId: root.facilityId,
     patientId: root.patientId,
+    appointmentId: root.appointmentId,
     threadId: root._id,
     direction: isPatient ? 'to_staff' : 'to_patient',
     senderUserId: req.user?.id,

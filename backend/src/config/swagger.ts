@@ -409,6 +409,22 @@ const paths: Record<string, Record<string, unknown>> = {
         responses: json200('Updated appointment'),
       },
     },
+    '/appointments/{id}/chat': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Read the consultation chat (doctor, in-progress only)',
+        security: [bearerAuth],
+        parameters: idParam(),
+        responses: json200('Consultation messages'),
+      },
+      post: {
+        tags: ['Appointments'],
+        summary: 'Send a consultation chat message (doctor, in-progress only)',
+        security: [bearerAuth],
+        parameters: idParam(),
+        responses: { '201': { description: 'Message sent' } },
+      },
+    },
     '/appointments/{id}/status': {
     patch: {
       tags: ['Appointments'],

@@ -15,6 +15,7 @@ import {
   appointmentRescheduleSchema,
   appointmentMeetingLinkSchema,
   appointmentFollowUpSchema,
+  replySchema,
   appointmentReferralSchema,
   paginationQuery,
 } from '../validators/schemas';
@@ -160,6 +161,26 @@ router.patch(
     metadata: (req) => ({ meetingLinkSet: Boolean(req.body.meetingLink) }),
   }),
   asyncHandler(appointmentController.updateAppointmentMeetingLink)
+);
+
+router.get(
+  '/:id/chat',
+  authenticate,
+  requireRole('doctor'),
+  requirePermission(PERMISSIONS.APPOINTMENTS_UPDATE),
+  validateObjectId('id'),
+  asyncHandler(appointmentController.getAppointmentChat)
+);
+
+router.post(
+  '/:id/chat',
+  authenticate,
+  requireRole('doctor'),
+  requirePermission(PERMISSIONS.APPOINTMENTS_UPDATE),
+  validateObjectId('id'),
+  validate(replySchema),
+  auditLog({ entity: 'Message', entityId: () => undefined }),
+  asyncHandler(appointmentController.sendAppointmentChatMessage)
 );
 
 router.patch(

@@ -4,6 +4,9 @@ import App from './App';
 import './index.css';
 import './i18n';
 
+document.documentElement.classList.remove('dark');
+localStorage.removeItem('has_theme');
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

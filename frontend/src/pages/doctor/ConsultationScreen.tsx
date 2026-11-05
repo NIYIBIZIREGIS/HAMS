@@ -47,7 +47,9 @@ import {
   UserPlus,
   CalendarCheck,
   PlayCircle,
+  MessageSquare,
 } from 'lucide-react';
+import { ConsultationChatModal } from '../../components/appointments/ConsultationChatModal';
 
 type ConsultationStep = 'vitals' | 'record' | 'prescription' | 'labs' | 'follow-up' | 'done';
 
@@ -91,6 +93,7 @@ export function ConsultationScreen() {
 
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [referralOpen, setReferralOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const { data: appointment, isLoading: loadingAppointment } = useQuery({
     queryKey: ['appointment', appointmentId],
@@ -388,9 +391,20 @@ export function ConsultationScreen() {
             </p>
           )}
         </div>
-        <Button variant="secondary" onClick={() => navigate(-1)}>
-          {t('common.back', 'Back')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {appointment?.status === 'In Progress' && (
+            <Button
+              variant="secondary"
+              icon={MessageSquare}
+              onClick={() => setChatOpen(true)}
+            >
+              {t('consultation.chatWithPatient', 'Chat with patient')}
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => navigate(-1)}>
+            {t('common.back', 'Back')}
+          </Button>
+        </div>
       </div>
 
       {patient && (
@@ -761,6 +775,13 @@ export function ConsultationScreen() {
           </CardBody>
         </Card>
       )}
+
+      <ConsultationChatModal
+        open={chatOpen}
+        appointmentId={appointmentId!}
+        patientName={patientName}
+        onClose={() => setChatOpen(false)}
+      />
 
       <FollowUpModal
         open={followUpOpen}
