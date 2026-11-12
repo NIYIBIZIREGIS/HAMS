@@ -5,26 +5,19 @@ import { Login } from '../pages/auth/Login';
 import '../i18n';
 
 describe('Login page', () => {
-  it('renders the three login modes', () => {
-    render(
+  it('offers only email and password sign-in', () => {
+    const { container } = render(
       <MemoryRouter>
         <Login />
       </MemoryRouter>
     );
-    expect(screen.getByRole('button', { name: 'Use email' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use national ID' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Log in with a code' })).toBeInTheDocument();
-  });
 
-  it('switches to the OTP tab when clicked', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default;
-    const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    );
-    await user.click(screen.getByRole('button', { name: 'Log in with a code' }));
-    expect(screen.getByRole('button', { name: 'Send code' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use national ID' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log in with a code' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send code' })).not.toBeInTheDocument();
+    expect(container.querySelectorAll('form')).toHaveLength(1);
   });
 });
