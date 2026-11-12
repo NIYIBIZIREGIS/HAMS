@@ -75,6 +75,17 @@ describe('Appointment booking — double-booking prevention', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects booking an appointment in the past', async () => {
+    const past = new Date(target);
+    past.setDate(past.getDate() - 14);
+
+    const res = await asReceptionist(request(app).post('/api/appointments')).send({
+      ...bookPayload(),
+      appointmentDate: past.toISOString(),
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('rejects booking on a doctor leave day', async () => {
     await DoctorLeave.create({ doctorId: doctor.doctor._id, date: target, reason: 'Leave' });
 

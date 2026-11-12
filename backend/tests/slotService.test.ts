@@ -38,6 +38,36 @@ describe('Slot generation', () => {
     expect(slots.every((s) => s.available === 1)).toBe(true);
   });
 
+  it('filters out slots that have already started today', async () => {
+    const deptId = '000000000000000000000001';
+    const { doctor } = await createDoctorWithSchedule(String(facility._id), deptId, {
+      startTime: '09:00',
+      endTime: '11:00',
+      slotDurationMinutes: 30,
+    });
+
+    const slots = await generateSlots({
+      doctorId: String(doctor._id),
+      date: '2026-06-01',
+      now: new Date('2026-06-01T10:05:00'),
+    });
+
+    expect(slots.map((s) => s.time)).toEqual(['10:30']);
+  });
+
+  it('returns no slots for dates before today', async () => {
+    const deptId = '000000000000000000000001';
+    const { doctor } = await createDoctorWithSchedule(String(facility._id), deptId);
+
+    const slots = await generateSlots({
+      doctorId: String(doctor._id),
+      date: '2026-05-25',
+      now: new Date('2026-06-01T10:05:00'),
+    });
+
+    expect(slots).toEqual([]);
+  });
+
   it('blocks break periods', async () => {
     const deptId = '000000000000000000000001';
     const { doctor } = await createDoctorWithSchedule(String(facility._id), deptId, {

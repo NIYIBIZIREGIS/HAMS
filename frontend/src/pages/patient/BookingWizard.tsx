@@ -72,6 +72,7 @@ export function BookingWizard() {
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     async function load() {
@@ -86,6 +87,11 @@ export function BookingWizard() {
       }
     }
     load();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const facilityDepartments = useMemo(
@@ -157,7 +163,19 @@ export function BookingWizard() {
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const visibleSlots = useMemo(() => {
+    if (form.date !== today) return slots;
+    return slots.filter((slot) => slot.time >= currentTime);
+  }, [currentTime, form.date, slots, today]);
+
+  useEffect(() => {
+    if (form.timeSlot && !visibleSlots.some((slot) => slot.time === form.timeSlot)) {
+      setForm((f) => ({ ...f, timeSlot: '' }));
+    }
+  }, [form.timeSlot, visibleSlots]);
 
   const selectedFacility = facilities.find((f) => f._id === form.facilityId);
   const selectedDepartment = facilityDepartments.find((d) => d._id === form.departmentId);
@@ -335,7 +353,7 @@ export function BookingWizard() {
                     </div>
                   ) : (
                     <SlotPicker
-                      slots={slots}
+                      slots={visibleSlots}
                       selected={form.timeSlot}
                       onSelect={(time) => update('timeSlot', time)}
                     />

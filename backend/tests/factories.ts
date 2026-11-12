@@ -78,7 +78,7 @@ export async function signin(app: import('express').Application, email: string, 
 export function monday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
+  const diff = (1 - day + 7) % 7 || 7;
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;

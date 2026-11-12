@@ -13,6 +13,8 @@ export interface GenerateSlotsParams {
   date: Date | string;
   /** Rescheduling an existing appointment must not count that appointment against itself. */
   excludeAppointmentId?: string;
+  /** Override the current time for deterministic availability calculations. */
+  now?: Date;
 }
 
 function startOfDay(date: Date): Date {
@@ -39,10 +41,19 @@ export async function generateSlots({
   doctorId,
   date,
   excludeAppointmentId,
+  now,
 }: GenerateSlotsParams): Promise<AvailableSlot[]> {
   const input = (date ?? '').toString();
   const day = /^\d{4}-\d{2}-\d{2}$/.test(input) ? new Date(`${input}T00:00:00`) : new Date(date);
   const dayOfWeek = day.getDay();
+
+  const currentTime = now ?? new Date();
+  const dayStart = startOfDay(day);
+  const todayStart = startOfDay(currentTime);
+  if (dayStart.getTime() < todayStart.getTime()) return [];
+
+  const isToday = dayStart.getTime() === todayStart.getTime();
+  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
   const schedule = await DoctorSchedule.findOne({
     doctorId,
@@ -67,6 +78,7 @@ export async function generateSlots({
 
   const slots: AvailableSlot[] = [];
   for (let cursor = start; cursor < end; cursor += slotDuration) {
+    if (isToday && cursor < currentMinutes) continue;
     const slotTime = minutesToTime(cursor);
     if (breakStart && breakEnd) {
       if (compareTimes(slotTime, breakStart) >= 0 && compareTimes(slotTime, breakEnd) < 0) {
