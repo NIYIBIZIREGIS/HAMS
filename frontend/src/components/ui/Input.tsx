@@ -45,7 +45,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
     const density = densityProp ?? inherited;
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
     const auth = tone === 'auth';
-    const dense = density === 'compact' && !auth;
+    const dense = density === 'compact';
 
     return (
       <div className={`w-full ${wrapperClassName}`}>
@@ -54,7 +54,9 @@ export const Input = forwardRef<HTMLInputElement, Props>(
             htmlFor={inputId}
             className={
               auth
-                ? 'mb-1.5 block text-base font-bold text-slate-700 dark:text-slate-200'
+                ? dense
+                  ? 'mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200'
+                  : 'mb-1.5 block text-base font-bold text-slate-700 dark:text-slate-200'
                 : dense
                   ? 'mb-1 block text-xs font-medium text-text-main'
                   : 'mb-1.5 block text-sm font-medium text-text-main'
@@ -67,7 +69,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
           {Icon && (
             <Icon
               className={`pointer-events-none absolute top-1/2 -translate-y-1/2 ${
-                auth ? 'left-4 h-5 w-5' : 'left-3 h-4 w-4'
+                auth ? (dense ? 'left-3 h-4 w-4' : 'left-4 h-5 w-5') : 'left-3 h-4 w-4'
               } ${auth ? 'text-slate-500 dark:text-slate-400' : 'text-text-muted'}`}
               aria-hidden="true"
             />
@@ -78,15 +80,17 @@ export const Input = forwardRef<HTMLInputElement, Props>(
 className={
               auth
                 ? [
-                        'w-full rounded-xl border-2 bg-white py-3 text-[1rem] font-bold text-slate-900',
+                        dense
+                          ? 'w-full rounded-xl border-2 bg-white py-2 text-sm font-bold text-slate-900'
+                          : 'w-full rounded-xl border-2 bg-white py-3 text-[1rem] font-bold text-slate-900',
                         'placeholder:font-normal placeholder:text-slate-400',
-                        'focus:outline-none focus:ring-4',
+                        dense ? 'focus:outline-none focus:ring-2' : 'focus:outline-none focus:ring-4',
                         // Lift on focus is what makes the field feel alive; the transform is
                         // listed in the transition so it eases instead of snapping.
                         'transition-[border-color,box-shadow,transform] duration-200 ease-out',
-                        'focus:-translate-y-0.5',
+                        dense ? '' : 'focus:-translate-y-0.5',
                         'dark:bg-slate-800 dark:text-slate-50 dark:placeholder:text-slate-500',
-                    Icon ? 'pl-12 pr-4' : 'px-4',
+                    Icon ? (dense ? 'pl-9 pr-3' : 'pl-12 pr-4') : (dense ? 'px-3' : 'px-4'),
                     error
                       ? 'border-red-600 focus:border-red-600 focus:ring-red-200 dark:border-red-500 dark:focus:ring-red-950'
                       : 'border-slate-300 hover:border-slate-400 focus:border-primary-600 focus:ring-primary-100 dark:border-slate-600 dark:hover:border-slate-500 dark:focus:border-primary-400 dark:focus:ring-primary-950',
@@ -112,7 +116,9 @@ className={
             id={`${inputId}-error`}
             className={`flex items-start gap-1.5 font-medium ${
               auth
-                ? 'mt-2 text-sm text-red-700 dark:text-red-300'
+                ? dense
+                  ? 'mt-1 text-xs text-red-700 dark:text-red-300'
+                  : 'mt-2 text-sm text-red-700 dark:text-red-300'
                 : dense
                   ? 'mt-1 text-xs text-status-cancelled-text'
                   : 'mt-2 text-xs text-status-cancelled-text'
@@ -128,7 +134,9 @@ className={
             id={`${inputId}-hint`}
             className={
               auth
-                ? 'mt-2 text-sm text-slate-600 dark:text-slate-400'
+                ? dense
+                  ? 'mt-1 text-xs text-slate-600 dark:text-slate-400'
+                  : 'mt-2 text-sm text-slate-600 dark:text-slate-400'
                 : dense
                   ? 'mt-1 text-xs text-text-muted'
                   : 'mt-2 text-xs text-text-muted'

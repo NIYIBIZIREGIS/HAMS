@@ -103,30 +103,30 @@ export function RegisterForm() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+      <div className="mb-3">
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
           {t('auth.registerTitle')}
         </h1>
-        <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+        <p className="mt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
           {t('auth.registerSubtitle')}
         </p>
       </div>
 
-      <ol className="mb-4 flex items-center gap-3">
+      <ol className="mb-3 flex items-center gap-3">
         {[1, 2].map((n) => (
-          <li key={n} className="flex flex-1 items-center gap-2.5">
+          <li key={n} className="flex flex-1 items-center gap-2">
             <span
               aria-current={step === n ? 'step' : undefined}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                 step >= n
                   ? 'bg-primary-700 text-white shadow-md shadow-primary-700/30 dark:bg-primary-600'
                   : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
               }`}
             >
-              {step > n ? <Check className="h-4 w-4" aria-hidden="true" /> : n}
+              {step > n ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : n}
             </span>
             <span
-              className={`text-sm font-bold leading-tight ${
+              className={`text-xs font-bold leading-tight ${
                 step >= n ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -146,11 +146,12 @@ export function RegisterForm() {
         ))}
       </ol>
 
-      <form onSubmit={handleSubmit} className="auth-form space-y-3" noValidate>
+      <form onSubmit={handleSubmit} className="auth-form space-y-2.5" noValidate>
         {step === 1 && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <Input
               tone="auth"
+              density="compact"
               label={t('auth.fullName')} name="fullName" icon={UserIcon}
               value={fullName}
               onChange={(e) => { setFullName(e.target.value); setError(''); }}
@@ -163,6 +164,7 @@ export function RegisterForm() {
             />
             <Input
               tone="auth"
+              density="compact"
               label={t('auth.email')} name="email" type="email" icon={Mail}
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(''); }}
@@ -171,9 +173,10 @@ export function RegisterForm() {
               error={inlineError('email', emailValid, 'Enter a valid email address')}
               className={validRing(emailValid, email)}
             />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Input
                 tone="auth"
+                density="compact"
                 label={t('auth.phone')} name="phone" icon={Phone}
                 value={phone}
                 onChange={(e) => { setPhone(e.target.value); setError(''); }}
@@ -184,6 +187,7 @@ export function RegisterForm() {
               />
               <Input
                 tone="auth"
+                density="compact"
                 label={t('auth.nationalId')} name="nationalId" icon={Hash}
                 value={nationalId}
                 onChange={(e) => { setNationalId(e.target.value); setError(''); }}
@@ -202,31 +206,33 @@ export function RegisterForm() {
         )}
 
         {step === 2 && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <Input
               tone="auth"
+              density="compact"
               label={t('auth.password')} name="password" type="password" icon={Lock}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
               required minLength={6} autoComplete="new-password"
             />
-            <ul className="grid gap-2 rounded-xl border border-slate-300 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-900">
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-xl border border-slate-300 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
               {rules.map(({ ok, label }) => (
                 <li
                   key={label}
-                  className={`flex items-center gap-2.5 text-sm font-bold ${
+                  className={`flex items-center gap-2 text-xs font-bold ${
                     ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {ok
-                    ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    : <span className="h-4 w-4 shrink-0 rounded-full border-2 border-current" aria-hidden="true" />}
+                    ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    : <span className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-current" aria-hidden="true" />}
                   {label}
                 </li>
               ))}
             </ul>
             <Input
               tone="auth"
+              density="compact"
               label={t('auth.confirmPassword')} name="confirmPassword" type="password" icon={Lock}
               value={confirm}
               onChange={(e) => { setConfirm(e.target.value); setError(''); }}
@@ -251,7 +257,7 @@ export function RegisterForm() {
 
         {error && (
           <p
-            className="mt-4 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+            className="mt-2.5 rounded-xl border-2 border-red-300 bg-red-50 p-2.5 text-xs font-bold text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
             role="alert"
           >
             {error}
