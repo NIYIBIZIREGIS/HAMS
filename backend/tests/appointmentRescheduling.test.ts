@@ -2,7 +2,7 @@ import request from 'supertest';
 import { Types } from 'mongoose';
 import { app } from '../src/app';
 import { connectTestDB, clearTestDB, closeTestDB } from './helpers';
-import { createFacility, createDoctorWithSchedule, createPatient } from './factories';
+import { createFacility, createDoctorWithSchedule, createPatient, monday } from './factories';
 import {
   Appointment,
   AppointmentHistory,
@@ -12,7 +12,7 @@ import {
   PatientDocument,
 } from '../src/models';
 
-const DAY = new Date('2026-11-02T00:00:00.000Z');
+const DAY = monday(new Date());
 const deptId = '000000000000000000000001';
 
 describe('Appointment rescheduling and doctor patient view', () => {

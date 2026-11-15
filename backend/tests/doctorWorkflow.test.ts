@@ -2,8 +2,8 @@ import request from 'supertest';
 import { Types } from 'mongoose';
 import { app } from '../src/app';
 import { connectTestDB, clearTestDB, closeTestDB } from './helpers';
-import { createFacility, createDoctorWithSchedule, createPatient } from './factories';
-import { Appointment, AppointmentHistory, Notification } from '../src/models';
+import { createFacility, createDoctorWithSchedule, createPatient, monday } from './factories';
+import { Appointment, AppointmentHistory, Message, Notification } from '../src/models';
 
 describe('Doctor appointment workflow', () => {
   let facility: Awaited<ReturnType<typeof createFacility>>;
@@ -51,6 +51,8 @@ describe('Doctor appointment workflow', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('Confirmed');
     expect(res.body.data.decidedAt).toBeTruthy();
+    expect(res.body.data.confirmedBy).toBe(String(doctor.user._id));
+    expect(res.body.data.confirmedAt).toBeTruthy();
 
     const history = await AppointmentHistory.find({ appointmentId: appointment._id }).lean();
     expect(history).toHaveLength(1);
@@ -67,6 +69,38 @@ describe('Doctor appointment workflow', () => {
     expect(notification).toBeTruthy();
     expect(notification?.link).toBe(`/appointments/${appointment._id}`);
     expect(notification?.title).toBe('Appointment confirmed');
+    expect(notification?.body).toContain('Test User');
+    expect(notification?.body).toContain('09:00');
+    expect(notification?.body).toContain('Test Hospital');
+
+    const conversation = await Message.findOne({ appointmentId: appointment._id }).lean();
+    expect(conversation).toBeTruthy();
+    expect(conversation?.threadId?.toString()).toBe(String(conversation?._id));
+    expect(conversation?.subject).toContain('Appointment confirmed');
+    expect(conversation?.body).toContain('Test Hospital');
+  });
+
+  it('does not duplicate confirmation effects when the doctor clicks accept twice', async () => {
+    const first = await asDoctor(
+      request(app).patch(`/api/appointments/${appointment._id}/accept`)
+    );
+    expect(first.status).toBe(200);
+
+    const second = await asDoctor(
+      request(app).patch(`/api/appointments/${appointment._id}/accept`)
+    );
+    expect(second.status).toBe(200);
+    expect(second.body.data.status).toBe('Confirmed');
+
+    expect(await AppointmentHistory.countDocuments({ appointmentId: appointment._id })).toBe(1);
+    expect(await Message.countDocuments({ appointmentId: appointment._id })).toBe(1);
+    expect(
+      await Notification.countDocuments({
+        patientId: patient.patient._id,
+        appointmentId: appointment._id,
+        title: 'Appointment confirmed',
+      })
+    ).toBe(1);
   });
 
   it('deep-links the doctor notification to the new appointment detail', async () => {
@@ -77,7 +111,7 @@ describe('Doctor appointment workflow', () => {
         facilityId: String(facility._id),
         doctorId: String(doctor.doctor._id),
         departmentId: deptId,
-        appointmentDate: '2026-11-02T00:00:00.000Z',
+        appointmentDate: monday(new Date()).toISOString(),
         timeSlot: '09:15',
         reason: 'Follow-up consultation',
         visitType: 'follow-up',

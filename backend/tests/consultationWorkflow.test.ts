@@ -22,6 +22,8 @@ function todayAt(time: string): Date {
   const [hours, minutes] = time.split(':').map(Number);
   const value = new Date();
   value.setHours(hours, minutes, 0, 0);
+  // Availability rejects slots that have already started, so keep tests on the next occurrence.
+  if (value.getTime() <= Date.now()) value.setDate(value.getDate() + 7);
   return value;
 }
 

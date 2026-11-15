@@ -13,12 +13,42 @@ const mocks = vi.hoisted(() => ({
   respondToRescheduleProposal: vi.fn(),
   getAppointmentPatientSummary: vi.fn(),
   cancelAppointment: vi.fn(),
+  selfCheckInAppointment: vi.fn(),
 }));
 
 vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>();
   return { ...actual, ...mocks };
 });
+
+const confirmedAppointment = {
+  _id: 'a2',
+  facilityId: 'f1',
+  patientId: {
+    _id: 'p1',
+    patientNumber: 'PT-00001',
+    userId: { fullName: 'Aline Patient' },
+  },
+  doctorId: { _id: 'd1', userId: { fullName: 'Dr. Uwase' } },
+  departmentId: { _id: 'dep1', name: 'General Medicine' },
+  appointmentDate: '2026-11-02T00:00:00.000Z',
+  timeSlot: '09:00',
+  reason: 'Follow-up visit',
+  visitType: 'follow-up',
+  status: 'Confirmed',
+  queueNumber: 12,
+  waitingRoom: {
+    appointmentId: 'a2',
+    status: 'Confirmed',
+    checkInAvailable: true,
+    checkInOpensAt: '2026-11-02T08:00:00.000Z',
+    checkInClosesAt: '2026-11-02T23:59:59.999Z',
+    checkInTime: null,
+    queueNumber: 12,
+    position: null,
+    peopleAhead: null,
+  },
+};
 
 const proposedAppointment = {
   _id: 'a1',
@@ -108,6 +138,48 @@ describe('Appointment reschedule UI', () => {
     await waitFor(() =>
       expect(mocks.respondToRescheduleProposal).toHaveBeenCalledWith('a1', 'accept', undefined)
     );
+  });
+
+  it('lets the patient self check in and shows live waiting room details', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default;
+    const user = userEvent.setup();
+    mocks.getAppointment
+      .mockResolvedValueOnce(confirmedAppointment)
+      .mockResolvedValueOnce({
+        ...confirmedAppointment,
+        status: 'Checked In',
+        checkInTime: '2026-11-02T08:55:00.000Z',
+        waitingRoom: {
+          ...confirmedAppointment.waitingRoom,
+          status: 'Checked In',
+          checkInAvailable: false,
+          checkInTime: '2026-11-02T08:55:00.000Z',
+          position: 2,
+          peopleAhead: 1,
+        },
+      });
+    mocks.selfCheckInAppointment.mockResolvedValue({
+      ...confirmedAppointment,
+      status: 'Checked In',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/appointments/a2']}>
+        <Routes>
+          <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole('button', { name: /check in now/i }));
+
+    await waitFor(() =>
+      expect(mocks.selfCheckInAppointment).toHaveBeenCalledWith('a2')
+    );
+    expect(await screen.findByText('Waiting room')).toBeInTheDocument();
+    expect(screen.getByText('#12')).toBeInTheDocument();
+    expect(screen.getByText('#2')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
   });
 
   it('shows the doctor the appointment-scoped patient summary', async () => {

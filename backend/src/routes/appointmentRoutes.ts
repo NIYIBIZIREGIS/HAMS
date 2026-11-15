@@ -183,6 +183,26 @@ router.post(
   asyncHandler(appointmentController.sendAppointmentChatMessage)
 );
 
+router.get(
+  '/:id/conversation',
+  authenticate,
+  requireRole('doctor', 'patient'),
+  requireAnyPermission(PERMISSIONS.APPOINTMENTS_UPDATE, PERMISSIONS.SELF_APPOINTMENTS),
+  validateObjectId('id'),
+  asyncHandler(appointmentController.getAppointmentConversation)
+);
+
+router.post(
+  '/:id/conversation',
+  authenticate,
+  requireRole('doctor', 'patient'),
+  requireAnyPermission(PERMISSIONS.APPOINTMENTS_UPDATE, PERMISSIONS.SELF_APPOINTMENTS),
+  validateObjectId('id'),
+  validate(replySchema),
+  auditLog({ entity: 'Message', entityId: () => undefined }),
+  asyncHandler(appointmentController.sendAppointmentConversationMessage)
+);
+
 router.patch(
   '/:id/start',
   authenticate,
@@ -278,6 +298,15 @@ router.get(
   asyncHandler(appointmentController.getAppointmentPatientSummary)
 );
 
+router.get(
+  '/:id/visit-summary',
+  authenticate,
+  requireRole('doctor', 'patient'),
+  requireAnyPermission(PERMISSIONS.RECORDS_VIEW, PERMISSIONS.SELF_RECORDS),
+  validateObjectId('id'),
+  asyncHandler(appointmentController.getVisitSummary)
+);
+
 router.put(
   '/:id',
   authenticate,
@@ -320,6 +349,20 @@ router.post(
     before: async (req) => Appointment.findById(req.params.id).lean(),
   }),
   asyncHandler(appointmentController.checkIn)
+);
+
+router.post(
+  '/:id/self-check-in',
+  authenticate,
+  requireRole('patient'),
+  requirePermission(PERMISSIONS.SELF_APPOINTMENTS),
+  validateObjectId('id'),
+  auditLog({
+    entity: 'Appointment',
+    entityId: (req) => req.params.id,
+    before: async (req) => Appointment.findById(req.params.id).lean(),
+  }),
+  asyncHandler(appointmentController.selfCheckIn)
 );
 
 router.delete(

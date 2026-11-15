@@ -91,7 +91,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        <Button tone="auth" type="submit" size="lg" loading={loading} className="w-full">
+        <Button tone="auth" type="submit" size="lg" loading={loading} className="w-full sm:w-auto sm:min-w-44">
           {t('auth.login')}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Button>

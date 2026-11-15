@@ -2,15 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Calendar, CalendarClock, CheckCircle2, Clock, MapPin, Stethoscope, Video, XCircle, ArrowLeft, AlertCircle, User,
+  Calendar, CalendarClock, CheckCircle2, ClipboardCheck, Clock, MapPin, MessageSquare, Stethoscope, Users, Video, XCircle, ArrowLeft, AlertCircle, User,
 } from 'lucide-react';
 import {
   cancelAppointment,
   getAppointment,
+  getErrorMessage,
   respondToRescheduleProposal,
+  selfCheckInAppointment,
   type Appointment,
 } from '../../services/api';
 import { StatusBadge } from '../../components/appointments/StatusBadge';
+import { VisitSummaryPanel } from '../../components/appointments/VisitSummaryPanel';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -30,27 +33,39 @@ export function AppointmentDetailPage() {
   const [proposalAction, setProposalAction] = useState<'accept' | 'reject' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [checkInError, setCheckInError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!id) {
       setError(t('appointments.noAppointments'));
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       setAppointment(await getAppointment(id));
     } catch {
-      setError(t('common.error'));
+      if (!silent) setError(t('common.error'));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id, t]);
 
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!appointment || !['Confirmed', 'Checked In', 'In Progress'].includes(appointment.status)) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void fetchData(true);
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [appointment, fetchData]);
 
   const doctorName = appointment
     ? typeof appointment.doctorId === 'object'
@@ -65,6 +80,9 @@ export function AppointmentDetailPage() {
     : '—';
 
   const canCancel = appointment ? ['Pending', 'Confirmed'].includes(appointment.status) : false;
+  const canMessage = appointment
+    ? ['Confirmed', 'Checked In', 'In Progress', 'Completed'].includes(appointment.status)
+    : false;
   const meetingLink =
     appointment &&
     ['Confirmed', 'Checked In', 'In Progress', 'Completed'].includes(appointment.status) &&
@@ -83,6 +101,21 @@ export function AppointmentDetailPage() {
       setError(t('common.error'));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!appointment) return;
+    setCheckingIn(true);
+    setCheckInError(null);
+    try {
+      await selfCheckInAppointment(appointment._id);
+      toast.success(t('appointments.checkInSuccess'));
+      await fetchData(true);
+    } catch (err) {
+      setCheckInError(getErrorMessage(err));
+    } finally {
+      setCheckingIn(false);
     }
   };
 
@@ -141,11 +174,22 @@ export function AppointmentDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" /> {t('common.back')}
         </button>
-        {canCancel && (
-          <Button variant="danger" icon={XCircle} onClick={() => setConfirmOpen(true)}>
-            {t('appointments.cancel')}
-          </Button>
-        )}
+        <div className="flex flex-wrap justify-end gap-2">
+          {canMessage && (
+            <Button
+              variant="outline"
+              icon={MessageSquare}
+              onClick={() => navigate(`/messages?appointment=${appointment._id}`)}
+            >
+              {t('appointments.messageDoctor')}
+            </Button>
+          )}
+          {canCancel && (
+            <Button variant="danger" icon={XCircle} onClick={() => setConfirmOpen(true)}>
+              {t('appointments.cancel')}
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -223,6 +267,116 @@ export function AppointmentDetailPage() {
           </div>
         )}
 
+        {appointment.status === 'Confirmed' && (
+          <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <ClipboardCheck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-text-main dark:text-white">
+                  {t('appointments.checkInTitle')}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-text-muted dark:text-slate-400">
+                  {t('appointments.checkInHint')}
+                </p>
+                {appointment.waitingRoom?.checkInAvailable ? (
+                  <Button
+                    className="mt-3"
+                    icon={ClipboardCheck}
+                    loading={checkingIn}
+                    onClick={() => void handleCheckIn()}
+                  >
+                    {t('appointments.checkInNow')}
+                  </Button>
+                ) : (
+                  appointment.waitingRoom && (
+                    <p className="mt-3 text-sm font-semibold text-primary">
+                      {t('appointments.checkInOpens', {
+                        when: new Date(appointment.waitingRoom.checkInOpensAt).toLocaleString(),
+                      })}
+                    </p>
+                  )
+                )}
+                {checkInError && (
+                  <p className="mt-2 text-sm font-medium text-status-cancelled-text">{checkInError}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {['Checked In', 'In Progress'].includes(appointment.status) && (
+          <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <Users className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-text-main dark:text-white">
+                  {appointment.status === 'In Progress'
+                    ? t('appointments.inConsultation')
+                    : t('appointments.waitingRoom')}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-text-muted dark:text-slate-400">
+                  {appointment.status === 'In Progress'
+                    ? t('appointments.inConsultationHint')
+                    : t('appointments.waitingRoomHint')}
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {appointment.waitingRoom?.queueNumber != null && (
+                    <div className="rounded-xl border border-primary/20 bg-card p-3">
+                      <p className="text-xs font-medium text-text-muted">{t('appointments.queueNumber')}</p>
+                      <p className="mt-1 text-2xl font-extrabold text-text-main dark:text-white">
+                        #{appointment.waitingRoom.queueNumber}
+                      </p>
+                    </div>
+                  )}
+                  {appointment.status === 'Checked In' && appointment.waitingRoom?.position != null && (
+                    <div className="rounded-xl border border-primary/20 bg-card p-3">
+                      <p className="text-xs font-medium text-text-muted">{t('appointments.queuePosition')}</p>
+                      <p className="mt-1 text-2xl font-extrabold text-text-main dark:text-white">
+                        #{appointment.waitingRoom.position}
+                      </p>
+                    </div>
+                  )}
+                  {appointment.status === 'Checked In' && appointment.waitingRoom?.peopleAhead != null && (
+                    <div className="rounded-xl border border-primary/20 bg-card p-3">
+                      <p className="text-xs font-medium text-text-muted">{t('appointments.peopleAhead')}</p>
+                      <p className="mt-1 text-2xl font-extrabold text-text-main dark:text-white">
+                        {appointment.waitingRoom.peopleAhead}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-3 text-xs font-medium text-text-muted">{t('appointments.liveUpdates')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {appointment.status === 'Confirmed' && (
+          <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-5">
+            <p className="flex items-center gap-2 text-sm font-bold text-text-main dark:text-white">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              {t('appointments.preVisitChecklist')}
+            </p>
+            <ul className="mt-3 space-y-2">
+              {[
+                t('appointments.preVisitId'),
+                t('appointments.preVisitArrive'),
+                t('appointments.preVisitRecords'),
+                t('appointments.preVisitOnline'),
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-sm text-text-muted dark:text-slate-400">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-surface p-4 dark:border-slate-800 dark:bg-slate-950">
@@ -237,7 +391,7 @@ export function AppointmentDetailPage() {
           ))}
         </dl>
 
-        {appointment.queueNumber && (
+        {appointment.queueNumber && !['Checked In', 'In Progress'].includes(appointment.status) && (
           <div className="mt-6 rounded-xl bg-primary p-5 text-white">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-200">{t('appointments.queueNumber')}</p>
             <p className="mt-1 text-4xl font-extrabold">#{appointment.queueNumber}</p>
@@ -264,6 +418,8 @@ export function AppointmentDetailPage() {
           </div>
         )}
       </Card>
+
+      {appointment.status === 'Completed' && <VisitSummaryPanel appointmentId={appointment._id} />}
 
       <Modal
         open={rejectOpen}

@@ -50,6 +50,9 @@ export interface IAppointment extends Document {
   proposedAt?: Date;
   decidedBy?: Types.ObjectId;
   decidedAt?: Date;
+  confirmedBy?: Types.ObjectId;
+  confirmedAt?: Date;
+  confirmationNotificationSentAt?: Date;
   referralId?: Types.ObjectId;
   reminder24hSentAt?: Date;
   reminder1hSentAt?: Date;
@@ -94,6 +97,9 @@ const appointmentSchema = new Schema<IAppointment>(
     proposedAt: { type: Date },
     decidedBy: { type: Schema.Types.ObjectId, ref: 'Users' },
     decidedAt: { type: Date },
+    confirmedBy: { type: Schema.Types.ObjectId, ref: 'Users' },
+    confirmedAt: { type: Date },
+    confirmationNotificationSentAt: { type: Date },
     referralId: { type: Schema.Types.ObjectId, ref: 'Referrals', default: null },
     reminder24hSentAt: { type: Date },
     reminder1hSentAt: { type: Date },

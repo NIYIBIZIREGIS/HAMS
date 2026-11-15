@@ -31,7 +31,6 @@ import {
   proposeReschedule,
   referPatient,
   rescheduleAppointment,
-  sendMessage,
   startConsultation,
   updateAppointmentMeetingLink,
   type Appointment,
@@ -43,7 +42,6 @@ import { CancelAppointmentModal } from '../../components/appointments/CancelAppo
 import { DoctorPatientSummary } from '../../components/appointments/DoctorPatientSummary';
 import { FollowUpModal, type FollowUpPayload } from '../../components/appointments/FollowUpModal';
 import { ReferralModal, type ReferralPayload } from '../../components/appointments/ReferralModal';
-import { AskPatientModal } from '../../components/appointments/AskPatientModal';
 import { MeetingLinkModal } from '../../components/appointments/MeetingLinkModal';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -76,8 +74,6 @@ export function DoctorAppointmentDetailPage() {
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [referralOpen, setReferralOpen] = useState(false);
   const [referralSaving, setReferralSaving] = useState(false);
-  const [askOpen, setAskOpen] = useState(false);
-  const [askSending, setAskSending] = useState(false);
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [meetingSaving, setMeetingSaving] = useState(false);
 
@@ -104,6 +100,9 @@ export function DoctorAppointmentDetailPage() {
 
   const patient = appointment && typeof appointment.patientId === 'object' ? appointment.patientId : null;
   const patientName = patient?.userId?.fullName ?? patient?.patientNumber ?? '—';
+  const canMessagePatient = appointment
+    ? ['Confirmed', 'Checked In', 'In Progress', 'Completed'].includes(appointment.status)
+    : false;
 
   const handleAccept = async () => {
     if (!appointment) return;
@@ -254,20 +253,6 @@ export function DoctorAppointmentDetailPage() {
       toast.error(errorMessage(err, t('common.error')));
     } finally {
       setReferralSaving(false);
-    }
-  };
-
-  const handleAskPatient = async (subject: string, body: string) => {
-    if (!patient) return;
-    setAskSending(true);
-    try {
-      await sendMessage({ patientId: patient._id, subject, body });
-      toast.success(t('askPatient.sent', 'Message sent to {{name}}.', { name: patientName }));
-      setAskOpen(false);
-    } catch (err) {
-      toast.error(errorMessage(err, t('common.error')));
-    } finally {
-      setAskSending(false);
     }
   };
 
@@ -463,14 +448,14 @@ export function DoctorAppointmentDetailPage() {
               </>
             )}
 
-            {patient && (
+            {patient && canMessagePatient && (
               <Button
                 variant="outline"
                 icon={MessageSquare}
-                onClick={() => setAskOpen(true)}
+                onClick={() => navigate(`/messages?appointment=${appointment._id}`)}
                 disabled={Boolean(actionLoading)}
               >
-                {t('doctorAppointments.askPatient', 'Ask patient')}
+                {t('doctorAppointments.messagePatient', 'Message patient')}
               </Button>
             )}
           </div>
@@ -713,17 +698,6 @@ export function DoctorAppointmentDetailPage() {
         onClose={() => !meetingSaving && setMeetingOpen(false)}
         onSave={(meetingLink) => void handleMeetingLink(meetingLink)}
         loading={meetingSaving}
-      />
-
-      <AskPatientModal
-        open={askOpen}
-        patientName={patientName}
-        defaultSubject={t('askPatient.defaultSubject', 'Question about your appointment on {{date}}', {
-          date: formatDate(appointment.appointmentDate),
-        })}
-        onClose={() => !askSending && setAskOpen(false)}
-        onSend={(subject, body) => void handleAskPatient(subject, body)}
-        loading={askSending}
       />
     </div>
   );

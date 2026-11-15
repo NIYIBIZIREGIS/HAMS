@@ -132,6 +132,21 @@ export interface Appointment {
   proposedAt?: string;
   decidedBy?: string;
   decidedAt?: string;
+  confirmedBy?: string;
+  confirmedAt?: string;
+  waitingRoom?: WaitingRoom;
+}
+
+export interface WaitingRoom {
+  appointmentId: string;
+  status: string;
+  checkInAvailable: boolean;
+  checkInOpensAt: string;
+  checkInClosesAt: string;
+  checkInTime: string | null;
+  queueNumber: number | null;
+  position: number | null;
+  peopleAhead: number | null;
 }
 
 export async function listFacilities(): Promise<Facility[]> {
@@ -500,6 +515,11 @@ export async function checkInAppointment(id: string) {
   return res.data.data as Appointment;
 }
 
+export async function selfCheckInAppointment(id: string) {
+  const res = await client.post(`/appointments/${id}/self-check-in`);
+  return res.data.data as Appointment;
+}
+
 export async function updateAppointmentStatus(id: string, status: string, cancellationReason?: string) {
   const res = await client.patch(`/appointments/${id}/status`, { status, cancellationReason });
   return res.data.data as Appointment;
@@ -634,6 +654,13 @@ export interface LaboratoryTest {
   completedAt?: string;
 }
 
+export interface VisitSummary {
+  appointment: Appointment;
+  record: MedicalRecord | null;
+  prescriptions: Prescription[];
+  labTests: LaboratoryTest[];
+}
+
 // Medical Records
 export async function createMedicalRecord(payload: {
   appointmentId: string;
@@ -676,6 +703,11 @@ export async function getPatientTimelinePage(
 export async function getRecordByAppointment(appointmentId: string): Promise<MedicalRecord> {
   const res = await client.get(`/medical-records/by-appointment/${appointmentId}`);
   return res.data.data as MedicalRecord;
+}
+
+export async function getVisitSummary(appointmentId: string): Promise<VisitSummary> {
+  const res = await client.get(`/appointments/${appointmentId}/visit-summary`);
+  return res.data.data as VisitSummary;
 }
 
 export async function updateMedicalRecord(id: string, payload: Partial<MedicalRecord>): Promise<MedicalRecord> {
@@ -1064,7 +1096,13 @@ export interface MessageThread {
   lastMessageAt: string;
   messageCount: number;
   unreadCount: number;
+  appointmentId?: string;
   patient?: { patientNumber: string };
+}
+
+export interface AppointmentConversation {
+  threadId: string | null;
+  messages: Message[];
 }
 
 export async function listMessages(params?: Record<string, unknown>): Promise<Message[]> {
@@ -1085,6 +1123,21 @@ export async function getMessageThread(threadId: string): Promise<Message[]> {
 
 export async function replyToThread(threadId: string, body: string): Promise<Message> {
   const res = await client.post(`/messages/threads/${threadId}/replies`, { body });
+  return res.data.data as Message;
+}
+
+export async function getAppointmentConversation(
+  appointmentId: string
+): Promise<AppointmentConversation> {
+  const res = await client.get(`/appointments/${appointmentId}/conversation`);
+  return res.data.data as AppointmentConversation;
+}
+
+export async function sendAppointmentConversationMessage(
+  appointmentId: string,
+  body: string
+): Promise<Message> {
+  const res = await client.post(`/appointments/${appointmentId}/conversation`, { body });
   return res.data.data as Message;
 }
 

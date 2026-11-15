@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   listMessageThreads,
   getMessageThread,
+  getAppointmentConversation,
   replyToThread,
+  sendAppointmentConversationMessage,
   type Message,
   type MessageThread,
 } from '../../services/api';
@@ -29,6 +31,11 @@ export function MessagesPage() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const ownDirection = user?.role === 'patient' ? 'to_staff' : 'to_patient';
+  const deepLinkAppointmentId = useMemo(
+    () => new URLSearchParams(window.location.search).get('appointment'),
+    []
+  );
+  const openedDeepLinkRef = useRef(false);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
@@ -63,6 +70,50 @@ export function MessagesPage() {
   useEffect(() => {
     loadThreads(1);
   }, [loadThreads]);
+
+  useEffect(() => {
+    if (!deepLinkAppointmentId || loading || openedDeepLinkRef.current) return;
+    openedDeepLinkRef.current = true;
+
+    let cancelled = false;
+    const openAppointmentConversation = async () => {
+      try {
+        const conversation = await getAppointmentConversation(deepLinkAppointmentId);
+        const threadId = conversation.threadId;
+        if (cancelled || !threadId) return;
+
+        setThreads((current) => {
+          if (current.some((thread) => thread.threadId === threadId)) return current;
+          const first = conversation.messages[0];
+          const last = conversation.messages[conversation.messages.length - 1];
+          return [
+            {
+              threadId,
+              subject: first?.subject ?? '',
+              lastBody: last?.body ?? '',
+              lastSenderName: last?.senderName ?? '',
+              lastDirection: last?.direction ?? 'to_patient',
+              lastMessageAt: last?.createdAt ?? new Date().toISOString(),
+              messageCount: conversation.messages.length,
+              unreadCount: 0,
+              appointmentId: deepLinkAppointmentId,
+            },
+            ...current,
+          ];
+        });
+        setOpenThreadId(threadId);
+        setMessages(conversation.messages);
+        setTotalUnread((current) => Math.max(0, current - 1));
+      } catch {
+        setError(null);
+      }
+    };
+
+    void openAppointmentConversation();
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkAppointmentId, loading]);
 
   // Opening a conversation loads it in full and clears its unread badge server-side.
   const openThread = useCallback(async (threadId: string) => {
@@ -104,7 +155,12 @@ export function MessagesPage() {
     setSending(true);
     setError(null);
     try {
-      await replyToThread(openThreadId, text);
+      const activeThread = threads.find((thread) => thread.threadId === openThreadId);
+      if (activeThread?.appointmentId) {
+        await sendAppointmentConversationMessage(activeThread.appointmentId, text);
+      } else {
+        await replyToThread(openThreadId, text);
+      }
       setDraft('');
       // Re-read the conversation so ordering and the server's timestamps are authoritative.
       const conversation = await getMessageThread(openThreadId);

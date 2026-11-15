@@ -11,6 +11,7 @@ import {
   type IAppointment,
   Notification,
   MedicalRecord,
+  Prescription,
   LaboratoryTest,
   PatientDocument,
   Message,
@@ -19,6 +20,7 @@ import { success, paginate } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 import { bookAppointment, assertValidTransition, nextQueueNumber } from '../services/bookingService';
 import { assertSlotIsAvailable } from '../services/appointmentConflictService';
+import { applyConfirmationEffects } from '../services/appointmentConfirmationService';
 import { grantMembership } from '../services/patientFacilityService';
 import {
   assertFacilityAccess,
@@ -58,6 +60,113 @@ const MEETING_LINK_EDITABLE_STATUSES: AppointmentStatus[] = [
   'In Progress',
   'Reschedule Proposed',
 ];
+
+const APPOINTMENT_CONVERSATION_STATUSES: AppointmentStatus[] = [
+  'Confirmed',
+  'Checked In',
+  'In Progress',
+  'Completed',
+];
+
+const CHECK_IN_WINDOW_MINUTES = 60;
+const CHECKED_IN_OR_LATER_STATUSES: AppointmentStatus[] = [
+  'Checked In',
+  'In Progress',
+  'Completed',
+];
+
+interface WaitingRoomSnapshot {
+  appointmentId: string;
+  status: AppointmentStatus;
+  checkInAvailable: boolean;
+  checkInOpensAt: string;
+  checkInClosesAt: string;
+  checkInTime: string | null;
+  queueNumber: number | null;
+  position: number | null;
+  peopleAhead: number | null;
+}
+
+function utcDayStart(value: Date | string): Date {
+  const date = new Date(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function utcDayEnd(value: Date | string): Date {
+  const start = utcDayStart(value);
+  return new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+}
+
+function appointmentStart(appointment: { appointmentDate: Date | string; timeSlot: string }): Date {
+  const [hours, minutes] = appointment.timeSlot.split(':').map(Number);
+  const date = new Date(appointment.appointmentDate);
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hours, minutes),
+  );
+}
+
+function checkInWindow(
+  appointment: { appointmentDate: Date | string; timeSlot: string },
+  now = new Date(),
+) {
+  const opensAt = new Date(
+    appointmentStart(appointment).getTime() - CHECK_IN_WINDOW_MINUTES * 60 * 1000,
+  );
+  const closesAt = utcDayEnd(appointment.appointmentDate);
+  return {
+    opensAt,
+    closesAt,
+    isOpen: now >= opensAt && now <= closesAt,
+  };
+}
+
+function referenceId(value: unknown): unknown {
+  if (value && typeof value === 'object' && '_id' in value) {
+    return (value as { _id: unknown })._id;
+  }
+  return value;
+}
+
+async function waitingRoomSnapshot(
+  appointment: Pick<
+    IAppointment,
+    '_id' | 'status' | 'appointmentDate' | 'timeSlot' | 'queueNumber' | 'checkInTime'
+  > & { doctorId: unknown },
+  now = new Date(),
+): Promise<WaitingRoomSnapshot> {
+  const window = checkInWindow(appointment, now);
+  let peopleAhead: number | null = null;
+  let position: number | null = null;
+
+  if (appointment.status === 'Checked In' && appointment.queueNumber != null) {
+    peopleAhead = await Appointment.countDocuments({
+      _id: { $ne: appointment._id },
+      doctorId: referenceId(appointment.doctorId),
+      appointmentDate: {
+        $gte: utcDayStart(appointment.appointmentDate),
+        $lte: utcDayEnd(appointment.appointmentDate),
+      },
+      status: 'Checked In',
+      queueNumber: { $lt: appointment.queueNumber },
+    });
+    position = peopleAhead + 1;
+  } else if (appointment.status === 'In Progress') {
+    peopleAhead = 0;
+    position = 0;
+  }
+
+  return {
+    appointmentId: String(appointment._id),
+    status: appointment.status,
+    checkInAvailable: appointment.status === 'Confirmed' && window.isOpen,
+    checkInOpensAt: window.opensAt.toISOString(),
+    checkInClosesAt: window.closesAt.toISOString(),
+    checkInTime: appointment.checkInTime ? new Date(appointment.checkInTime).toISOString() : null,
+    queueNumber: appointment.queueNumber ?? null,
+    position,
+    peopleAhead,
+  };
+}
 
 function redactMeetingLink<T extends { status?: AppointmentStatus; meetingLink?: string | null }>(
   req: AuthRequest,
@@ -118,7 +227,8 @@ async function doctorDisplayName(doctorId: unknown): Promise<string> {
 async function notifyPatientAboutAppointment(
   appointment: { _id: unknown; patientId: unknown; facilityId: unknown },
   title: string,
-  body: string
+  body: string,
+  link?: string
 ): Promise<void> {
   try {
     await Notification.create({
@@ -129,7 +239,7 @@ async function notifyPatientAboutAppointment(
       type: 'appointment',
       title,
       body,
-      link: appointmentLinks(String(appointment._id)).patient,
+      link: link ?? appointmentLinks(String(appointment._id)).patient,
     });
   } catch (err) {
     console.error('[notification] appointment notify failed:', err instanceof Error ? err.message : err);
@@ -278,7 +388,12 @@ export async function getAppointment(req: AuthRequest, res: Response) {
     .lean();
   if (!appointment) throw new AppError(404, 'Appointment not found');
   await assertAccess(req, appointment);
-  success(res, 200, redactMeetingLink(req, appointment));
+  const payload = redactMeetingLink(req, appointment);
+  if (hasRole(req.user, ROLE_PATIENT)) {
+    success(res, 200, { ...payload, waitingRoom: await waitingRoomSnapshot(appointment) });
+    return;
+  }
+  success(res, 200, payload);
 }
 
 export async function createAppointment(req: AuthRequest, res: Response) {
@@ -562,29 +677,178 @@ export async function sendAppointmentChatMessage(req: AuthRequest, res: Response
   success(res, 201, message);
 }
 
+function appointmentConversationLink(id: string): string {
+  return `/messages?appointment=${id}`;
+}
+
+async function appointmentConversationThread(appointment: IAppointment) {
+  const root = await Message.findOne({
+    appointmentId: appointment._id,
+    patientId: appointment.patientId,
+    facilityId: appointment.facilityId,
+  }).sort({ createdAt: 1 });
+
+  if (!root) {
+    return { threadId: null, messages: [] };
+  }
+
+  const threadId = root.threadId ?? root._id;
+  const messages = await Message.find({
+    appointmentId: appointment._id,
+    $or: [{ threadId }, { _id: threadId }],
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  return { threadId, messages };
+}
+
+async function notifyAppointmentConversationMessage(
+  appointment: IAppointment,
+  fromPatient: boolean,
+  senderName: string
+): Promise<void> {
+  const when = `${formatAppointmentDate(appointment.appointmentDate)} at ${appointment.timeSlot}`;
+  const link = appointmentConversationLink(String(appointment._id));
+
+  try {
+    if (fromPatient) {
+      await Notification.create({
+        doctorId: appointment.doctorId,
+        facilityId: appointment.facilityId,
+        appointmentId: appointment._id,
+        recipientType: 'doctor',
+        type: 'message',
+        title: 'New message from patient',
+        body: `${senderName} sent a message about the appointment on ${when}.`,
+        link,
+      });
+    } else {
+      await Notification.create({
+        patientId: appointment.patientId,
+        facilityId: appointment.facilityId,
+        appointmentId: appointment._id,
+        recipientType: 'patient',
+        type: 'message',
+        title: 'New message from your doctor',
+        body: `You have a new message about your appointment on ${when}.`,
+        link,
+      });
+    }
+  } catch (err) {
+    console.error(
+      '[notification] appointment conversation notify failed:',
+      err instanceof Error ? err.message : err
+    );
+  }
+}
+
+export async function getAppointmentConversation(req: AuthRequest, res: Response) {
+  const appointment = await Appointment.findById(req.params.id);
+  if (!appointment) throw new AppError(404, 'Appointment not found');
+  await assertAccess(req, appointment);
+
+  const thread = await appointmentConversationThread(appointment);
+  const inbound = hasRole(req.user, ROLE_PATIENT) ? 'to_patient' : 'to_staff';
+
+  if (thread.messages.length > 0) {
+    await Message.updateMany(
+      {
+        _id: { $in: thread.messages.map((message) => message._id) },
+        direction: inbound,
+        isRead: false,
+      },
+      { $set: { isRead: true, readAt: new Date() } }
+    );
+  }
+
+  success(res, 200, thread);
+}
+
+export async function sendAppointmentConversationMessage(req: AuthRequest, res: Response) {
+  const appointment = await Appointment.findById(req.params.id);
+  if (!appointment) throw new AppError(404, 'Appointment not found');
+  await assertAccess(req, appointment);
+
+  if (!APPOINTMENT_CONVERSATION_STATUSES.includes(appointment.status)) {
+    throw new AppError(409, 'Messaging is available once the appointment is confirmed');
+  }
+
+  const body = String((req.body as { body?: string }).body ?? '').trim();
+  if (!body) throw new AppError(400, 'Message body is required');
+
+  const isPatient = hasRole(req.user, ROLE_PATIENT);
+  const sender = await User.findById(req.user!.id).select('fullName').lean();
+  const senderName = sender?.fullName ?? (isPatient ? 'Patient' : 'Doctor');
+
+  const root = await Message.findOne({
+    appointmentId: appointment._id,
+    patientId: appointment.patientId,
+    facilityId: appointment.facilityId,
+  }).sort({ createdAt: 1 });
+
+  let message;
+  if (root) {
+    message = await Message.create({
+      facilityId: appointment.facilityId,
+      patientId: appointment.patientId,
+      appointmentId: appointment._id,
+      threadId: root.threadId ?? root._id,
+      direction: isPatient ? 'to_staff' : 'to_patient',
+      senderUserId: req.user!.id,
+      senderName,
+      subject: root.subject,
+      body,
+      isRead: false,
+    });
+  } else {
+    message = await Message.create({
+      facilityId: appointment.facilityId,
+      patientId: appointment.patientId,
+      appointmentId: appointment._id,
+      direction: isPatient ? 'to_staff' : 'to_patient',
+      senderUserId: req.user!.id,
+      senderName,
+      subject: `Appointment conversation - ${formatAppointmentDate(appointment.appointmentDate)} at ${appointment.timeSlot}`,
+      body,
+      isRead: false,
+    });
+    message.threadId = message._id;
+    await message.save();
+  }
+
+  await notifyAppointmentConversationMessage(appointment, isPatient, senderName);
+  success(res, 201, message);
+}
+
 export async function acceptAppointment(req: AuthRequest, res: Response) {
   const existing = await Appointment.findById(req.params.id);
   if (!existing) throw new AppError(404, 'Appointment not found');
   await assertAccess(req, existing);
+
+  if (existing.status === 'Confirmed') {
+    // A duplicate click is a retry, not a second decision. The side effects are idempotent.
+    await applyConfirmationEffects(existing);
+    return success(res, 200, existing);
+  }
 
   if (existing.status !== 'Pending') {
     throw new AppError(409, `Only pending appointments can be accepted (current status: ${existing.status})`);
   }
   assertValidTransition(existing.status, 'Confirmed');
 
-  const decidedAt = new Date();
+  const confirmedAt = new Date();
   const updated = await transitionAtomically(existing, 'Confirmed', {
     decidedBy: req.user!.id,
-    decidedAt,
+    decidedAt: confirmedAt,
+    confirmedBy: req.user!.id,
+    confirmedAt,
+    reminder24hSentAt: null,
+    reminder1hSentAt: null,
   });
   await recordTransition(existing, 'Confirmed', req.user!.id);
 
-  const doctorName = await doctorDisplayName(updated.doctorId);
-  await notifyPatientAboutAppointment(
-    updated,
-    'Appointment confirmed',
-    `Your appointment on ${formatAppointmentDate(updated.appointmentDate)} at ${updated.timeSlot} with ${doctorName} has been confirmed.`
-  );
+  await applyConfirmationEffects(updated);
   success(res, 200, updated);
 }
 
@@ -685,11 +949,16 @@ export async function respondToProposal(req: AuthRequest, res: Response) {
       excludeAppointmentId: String(existing._id),
     });
 
+    const confirmedAt = new Date();
     const updated = await transitionAtomically(existing, 'Confirmed', {
       appointmentDate: existing.proposedDate,
       timeSlot: existing.proposedTimeSlot,
       decidedBy: req.user!.id,
-      decidedAt: new Date(),
+      decidedAt: confirmedAt,
+      confirmedBy: req.user!.id,
+      confirmedAt,
+      reminder24hSentAt: null,
+      reminder1hSentAt: null,
     });
     await recordTransition(
       existing,
@@ -697,6 +966,7 @@ export async function respondToProposal(req: AuthRequest, res: Response) {
       req.user!.id,
       `Patient accepted the proposed time: ${formatAppointmentDate(existing.proposedDate)} at ${existing.proposedTimeSlot}`
     );
+    await applyConfirmationEffects(updated);
     await notifyDoctorAboutAppointment(
       updated,
       'Reschedule accepted',
@@ -749,6 +1019,8 @@ export async function rescheduleAppointment(req: AuthRequest, res: Response) {
   const updated = await transitionAtomically(existing, 'Confirmed', {
     appointmentDate: newDate,
     timeSlot: body.timeSlot,
+    reminder24hSentAt: null,
+    reminder1hSentAt: null,
   });
   const note = body.reason || body.note || `Rescheduled to ${formatAppointmentDate(newDate)} at ${body.timeSlot}`;
   await recordTransition(existing, 'Confirmed', req.user!.id, note);
@@ -808,6 +1080,36 @@ export async function getAppointmentPatientSummary(req: AuthRequest, res: Respon
   success(res, 200, { patient, medicalHistory, previousVisits, labResults, documents });
 }
 
+export async function getVisitSummary(req: AuthRequest, res: Response) {
+  const appointment = await Appointment.findById(req.params.id).lean();
+  if (!appointment) throw new AppError(404, 'Appointment not found');
+  await assertAccess(req, appointment);
+
+  if (appointment.status !== 'Completed') {
+    throw new AppError(409, 'The visit summary is available after the consultation is completed');
+  }
+
+  const [visit, record] = await Promise.all([
+    Appointment.findById(appointment._id)
+      .populate({ path: 'doctorId', populate: { path: 'userId', select: 'fullName' } })
+      .populate('departmentId', 'name')
+      .populate('facilityId', 'name')
+      .lean(),
+    MedicalRecord.findOne({ appointmentId: appointment._id }).lean(),
+  ]);
+
+  const recordScope = record
+    ? { $or: [{ appointmentId: appointment._id }, { medicalRecordId: record._id }] }
+    : { appointmentId: appointment._id };
+
+  const [prescriptions, labTests] = await Promise.all([
+    Prescription.find(recordScope).sort({ issuedAt: -1 }).lean(),
+    LaboratoryTest.find(recordScope).sort({ requestedAt: -1 }).lean(),
+  ]);
+
+  success(res, 200, { appointment: visit, record, prescriptions, labTests });
+}
+
 export async function updateStatus(req: AuthRequest, res: Response) {
   const existing = await Appointment.findById(req.params.id);
   if (!existing) throw new AppError(404, 'Appointment not found');
@@ -827,45 +1129,55 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     updates.decidedBy = req.user!.id;
     updates.decidedAt = now;
   }
+  if (body.status === 'Confirmed') {
+    updates.confirmedBy = req.user!.id;
+    updates.confirmedAt = now;
+    updates.reminder24hSentAt = null;
+    updates.reminder1hSentAt = null;
+  }
   if (body.cancellationReason) updates.cancellationReason = body.cancellationReason;
   if (body.status === 'Declined') updates.declineReason = body.cancellationReason;
 
   const updated = await transitionAtomically(existing, body.status, updates);
   await recordTransition(existing, body.status, req.user!.id, body.cancellationReason);
 
-  try {
-    const p = updated.patientId as any;
-    const d = updated.doctorId as any;
-    if (p && p._id) {
-      const suffix =
-        body.status === 'Declined' || body.status === 'Cancelled'
-          ? ` Reason: ${body.cancellationReason ?? 'No reason provided.'}`
-          : '';
-      await Notification.create({
-        patientId: p._id,
-        facilityId: updated.facilityId,
-        appointmentId: updated._id,
-        recipientType: 'patient',
-        type: 'appointment',
-        title: `Appointment ${body.status}`,
-        body: `Your appointment status has been updated to ${body.status}.${suffix}`,
-        link: appointmentLinks(String(updated._id)).patient,
-      });
+  if (body.status === 'Confirmed') {
+    await applyConfirmationEffects(updated);
+  } else {
+    try {
+      const p = updated.patientId as any;
+      const d = updated.doctorId as any;
+      if (p && p._id) {
+        const suffix =
+          body.status === 'Declined' || body.status === 'Cancelled'
+            ? ` Reason: ${body.cancellationReason ?? 'No reason provided.'}`
+            : '';
+        await Notification.create({
+          patientId: p._id,
+          facilityId: updated.facilityId,
+          appointmentId: updated._id,
+          recipientType: 'patient',
+          type: 'appointment',
+          title: `Appointment ${body.status}`,
+          body: `Your appointment status has been updated to ${body.status}.${suffix}`,
+          link: appointmentLinks(String(updated._id)).patient,
+        });
+      }
+      if (d && d._id) {
+        await Notification.create({
+          doctorId: d._id,
+          facilityId: updated.facilityId,
+          appointmentId: updated._id,
+          recipientType: 'doctor',
+          type: 'appointment',
+          title: `Appointment ${body.status}`,
+          body: `An appointment status has been updated to ${body.status}.`,
+          link: appointmentLinks(String(updated._id)).doctor,
+        });
+      }
+    } catch (err) {
+      console.error('[notification] appointment status notify failed:', err instanceof Error ? err.message : err);
     }
-    if (d && d._id) {
-      await Notification.create({
-        doctorId: d._id,
-        facilityId: updated.facilityId,
-        appointmentId: updated._id,
-        recipientType: 'doctor',
-        type: 'appointment',
-        title: `Appointment ${body.status}`,
-        body: `An appointment status has been updated to ${body.status}.`,
-        link: appointmentLinks(String(updated._id)).doctor,
-      });
-    }
-  } catch (err) {
-    console.error('[notification] appointment status notify failed:', err instanceof Error ? err.message : err);
   }
   success(res, 200, updated);
 }
@@ -876,7 +1188,8 @@ async function doctorDayAction(
   toStatus: AppointmentStatus,
   allowedFrom: AppointmentStatus[],
   notificationTitle: string,
-  notificationBody: string
+  notificationBody: string,
+  patientLink?: string
 ) {
   const existing = await Appointment.findById(req.params.id);
   if (!existing) throw new AppError(404, 'Appointment not found');
@@ -895,7 +1208,7 @@ async function doctorDayAction(
 
   const updated = await transitionAtomically(existing, toStatus, updates);
   await recordTransition(existing, toStatus, req.user!.id);
-  await notifyPatientAboutAppointment(updated, notificationTitle, notificationBody);
+  await notifyPatientAboutAppointment(updated, notificationTitle, notificationBody, patientLink);
   success(res, 200, updated);
 }
 
@@ -917,7 +1230,8 @@ export async function completeConsultation(req: AuthRequest, res: Response) {
     'Completed',
     ['In Progress'],
     'Consultation completed',
-    'Your consultation has been completed.'
+    'Your consultation is complete. Your after-visit summary is now available.',
+    `${appointmentLinks(String(req.params.id)).patient}#visit-summary`
   );
 }
 
@@ -963,9 +1277,18 @@ export async function bookFollowUp(req: AuthRequest, res: Response) {
 
   let finalAppointment = followUp;
   if (body.autoConfirm !== false) {
+    const confirmedAt = new Date();
     const confirmed = await Appointment.findByIdAndUpdate(
       followUp._id,
-      { status: 'Confirmed', decidedBy: req.user!.id, decidedAt: new Date() },
+      {
+        status: 'Confirmed',
+        decidedBy: req.user!.id,
+        decidedAt: confirmedAt,
+        confirmedBy: req.user!.id,
+        confirmedAt,
+        reminder24hSentAt: null,
+        reminder1hSentAt: null,
+      },
       { new: true, runValidators: true }
     );
     if (confirmed) {
@@ -976,11 +1299,7 @@ export async function bookFollowUp(req: AuthRequest, res: Response) {
 
   const when = `${formatAppointmentDate(finalAppointment.appointmentDate)} at ${finalAppointment.timeSlot}`;
   if (finalAppointment.status === 'Confirmed') {
-    await notifyPatientAboutAppointment(
-      finalAppointment,
-      'Follow-up booked',
-      `Your follow-up appointment is confirmed for ${when}.`
-    );
+    await applyConfirmationEffects(finalAppointment);
   } else {
     await notifyPatientAboutAppointment(
       finalAppointment,
@@ -1111,6 +1430,43 @@ export async function checkIn(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error('[notification] checkin notify failed:', err instanceof Error ? err.message : err);
   }
+  success(res, 200, updated);
+}
+
+export async function selfCheckIn(req: AuthRequest, res: Response) {
+  const existing = await Appointment.findById(req.params.id);
+  if (!existing) throw new AppError(404, 'Appointment not found');
+  await assertAccess(req, existing);
+
+  if (CHECKED_IN_OR_LATER_STATUSES.includes(existing.status)) {
+    success(res, 200, existing);
+    return;
+  }
+
+  if (existing.status !== 'Confirmed') {
+    throw new AppError(409, 'Only confirmed appointments can be checked in.');
+  }
+
+  const now = new Date();
+  const window = checkInWindow(existing, now);
+  if (!window.isOpen) {
+    throw new AppError(
+      409,
+      now < window.opensAt
+        ? 'Check-in opens one hour before the appointment.'
+        : 'Check-in has closed for this appointment.',
+    );
+  }
+
+  const queueNumber =
+    existing.queueNumber ?? (await nextQueueNumber(String(existing.facilityId), existing.appointmentDate));
+  const updated = await transitionAtomically(existing, 'Checked In', {
+    checkInTime: now,
+    queueNumber,
+  });
+  await recordTransition(existing, 'Checked In', req.user!.id, 'Patient self check-in');
+  await notifyPatientAboutAppointment(updated, 'Appointment checked in', 'You have checked in for your appointment.');
+  await notifyDoctorAboutAppointment(updated, 'Appointment checked in', 'A patient has checked in for their appointment.');
   success(res, 200, updated);
 }
 

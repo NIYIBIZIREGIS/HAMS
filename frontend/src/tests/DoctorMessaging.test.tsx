@@ -1,20 +1,30 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AskPatientModal } from '../components/appointments/AskPatientModal';
 import { MessagesPage } from '../pages/patient/MessagesPage';
 import { useAuthStore } from '../store/authStore';
 import '../i18n';
 
-const { listMessageThreads, getMessageThread, replyToThread } = vi.hoisted(() => ({
+const {
+  listMessageThreads,
+  getMessageThread,
+  getAppointmentConversation,
+  replyToThread,
+  sendAppointmentConversationMessage,
+} = vi.hoisted(() => ({
   listMessageThreads: vi.fn(),
   getMessageThread: vi.fn(),
+  getAppointmentConversation: vi.fn(),
   replyToThread: vi.fn(),
+  sendAppointmentConversationMessage: vi.fn(),
 }));
 
 vi.mock('../services/api', () => ({
   listMessageThreads,
   getMessageThread,
+  getAppointmentConversation,
   replyToThread,
+  sendAppointmentConversationMessage,
 }));
 
 describe('Doctor messaging', () => {
@@ -72,6 +82,43 @@ describe('Doctor messaging', () => {
     ).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('You')).toBeInTheDocument();
     expect(getMessageThread).toHaveBeenCalledWith('thread-1');
+  }, 20000);
+
+  afterEach(() => {
+    window.history.pushState({}, '', '/');
+  });
+
+  it('opens an appointment conversation from a deep link', async () => {
+    useAuthStore.setState({
+      user: { id: 'patient-1', fullName: 'Aline Patient', role: 'patient' },
+    });
+    listMessageThreads.mockResolvedValue({ items: [], page: 1, pages: 0, total: 0 });
+    getAppointmentConversation.mockResolvedValue({
+      threadId: 'thread-appointment',
+      messages: [
+        {
+          _id: 'message-appointment',
+          facilityId: 'facility-1',
+          patientId: 'patient-1',
+          senderName: 'Dr. Grace',
+          subject: 'Appointment conversation',
+          body: 'Please bring your previous lab results.',
+          isRead: false,
+          createdAt: '2026-11-03T08:00:00.000Z',
+          threadId: 'thread-appointment',
+          direction: 'to_patient',
+        },
+      ],
+    });
+    window.history.pushState({}, '', '/messages?appointment=appt-1');
+
+    render(<MessagesPage />);
+
+    expect(
+      (await screen.findAllByText('Please bring your previous lab results.')).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Appointment conversation')).toBeInTheDocument();
+    expect(getAppointmentConversation).toHaveBeenCalledWith('appt-1');
   }, 20000);
 
   it('sends a secure question from the appointment detail dialog', async () => {
