@@ -109,10 +109,12 @@ export function DoctorAppointmentDetailPage() {
     setAccepting(true);
     try {
       await acceptAppointment(appointment._id);
-      toast.success(t('doctorAppointments.accepted', { name: patientName }));
-      await fetchData();
+      await startConsultation(appointment._id);
+      toast.success(t('doctorAppointments.started', { name: patientName }));
+      navigate(`/consultation/${appointment._id}`);
     } catch (err) {
       toast.error(errorMessage(err, t('common.error')));
+      await fetchData();
     } finally {
       setAccepting(false);
     }

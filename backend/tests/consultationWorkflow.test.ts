@@ -98,6 +98,13 @@ describe('Phase 3 consultation workflow', () => {
     expect(started.status).toBe(200);
     expect(started.body.data.status).toBe('In Progress');
 
+    const startNotification = await Notification.findOne({
+      patientId: patient.patient._id,
+      appointmentId: appointment._id,
+      title: 'Consultation started',
+    }).lean();
+    expect(startNotification?.body).toBe('Your consultation has started.');
+
     const record = await request(app)
       .post('/api/medical-records')
       .set('Authorization', `Bearer ${doctorToken}`)
